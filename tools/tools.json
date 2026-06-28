@@ -1,0 +1,551 @@
+[
+  {
+    "type": "function",
+    "function": {
+      "name": "web_search",
+      "description": "Recherche internet via Google. Pour evenements recents, prix, actualites, informations publiques. Utilise APRES avoir verifie que la reponse n'est pas dans la memoire ou les skills. N'utilise PAS pour des questions personnelles sur Serge (utilise memory_query) ni pour les reseaux sociaux (utilise social_search).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Requete en francais"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "memory_query",
+      "description": "Recherche dans la memoire personnelle de Serge. Utilise pour les questions sur Serge, ses preferences, son travail, les decisions passees. N'utilise PAS pour des informations publiques (utilise web_search) ni pour ce qui est deja dans la conversation en cours.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Requete semantique en francais"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "get_datetime",
+      "description": "Renvoie la date et l'heure actuelles. Utile pour le contexte temporel des conversations, les references au passe/futur.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "save_skill",
+      "description": "Enregistre une nouvelle competence (skill) apprise. Utilise APRES avoir identifie un pattern recurrent, une procedure stabilisee, un apprentissage. Ne PAS utiliser pour des informations ponctuelles.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Titre court de la skill"
+          },
+          "trigger": {
+            "type": "string",
+            "description": "Quand utiliser cette skill"
+          },
+          "steps": {
+            "type": "string",
+            "description": "Etapes detailles"
+          },
+          "pitfalls": {
+            "type": "string",
+            "description": "Pieges a eviter (optionnel)"
+          },
+          "verification": {
+            "type": "string",
+            "description": "Comment verifier le succes (optionnel)"
+          }
+        },
+        "required": [
+          "title",
+          "trigger",
+          "steps"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "search_skills",
+      "description": "Recherche dans les skills enregistrees. Utilise AVANT d'entreprendre une action repetitive pour voir si une skill existe deja.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Requete textuelle"
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "web_navigate",
+      "description": "Ouvre une URL et extrait le contenu textuel. Utilise pour explorer des sites web, lire des articles, verifier des informations. Necessite un serveur MCP sur port 5200.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL complete a ouvrir"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "web_screenshot",
+      "description": "Capture d'ecran d'une URL. Utile pour voir le rendu visuel d'un site. Necessite un serveur MCP sur port 5200.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL complete a capturer"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "atlas",
+      "description": "Interroge la memoire vectorielle Atlas. Recherche semantique dans l'historique des conversations. Utilise pour retrouver decisions, preferences, informations contextuelles passee. N'utilise PAS pour la conversation en cours (deja en contexte).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "context": {
+            "type": "string",
+            "description": "Description de ce qu on cherche"
+          }
+        },
+        "required": [
+          "context"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "social_search",
+      "description": "Recherche sur les reseaux sociaux (Twitter/X, Reddit, etc.) via Xpoz. Pour tendances, avis, discussions en cours. N'utilise PAS pour des faits generaux (utilise web_search).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Requete de recherche"
+          },
+          "platform": {
+            "type": "string",
+            "description": "Plateforme (twitter, reddit, instagram, tiktok, all par defaut)",
+            "default": "all"
+          },
+          "count": {
+            "type": "integer",
+            "description": "Nombre de resultats (defaut: 5)",
+            "default": 5
+          }
+        },
+        "required": [
+          "query"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "workspace_state",
+      "description": "Gere l'etat persistant du workspace (variables, configuration, etat courant). Permet de sauvegarder et restaurer le contexte entre les sessions. Utilise pour stocker des informations de session, des preferences temporaires, ou des donnees de progression.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "get",
+              "set",
+              "delete",
+              "list"
+            ],
+            "description": "Action a effectuer"
+          },
+          "key": {
+            "type": "string",
+            "description": "Cle de la variable (pour get/set/delete)"
+          },
+          "value": {
+            "type": "string",
+            "description": "Valeur a stocker (pour set uniquement)"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "tmux_session",
+      "description": "Gere les sessions tmux. Permet de lister, creer, envoyer des commandes, et lire la sortie de sessions terminal persistantes. Utilise pour des taches longues, des processus background, ou des sessions de developpement.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "list",
+              "send",
+              "capture"
+            ],
+            "description": "Action: list (lister les sessions), send (envoyer une commande), capture (lire la sortie)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Nom de la session tmux (requis pour send/capture)"
+          },
+          "command": {
+            "type": "string",
+            "description": "Commande a envoyer (requis pour send)"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "render_preview",
+      "description": "Genere un apercu visuel dans le chat (HTML/CSS rendu en image). Utilise pour prototyper des designs, des maquettes, des mises en page avant de les finaliser. Limite: rendu statique, pas d'interactivite.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "html": {
+            "type": "string",
+            "description": "Code HTML/CSS a rendre"
+          }
+        },
+        "required": [
+          "html"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "self_inspect",
+      "description": "Inspecte son propre code : architecture, outils, fichiers, tests, git, systeme. OBLIGATOIRE quand Serge demande de decrire son architecture, ses capacites, son etat. Utilise aussi pour le debugging interne ou pour verifier sa propre configuration.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "fs_read",
+      "description": "Lit un fichier local dans ~/santana/. Permet de s'auto-inspecter (code, logs, config). Securise : bloque sur .env, tokens, secrets.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Chemin relatif depuis ~/santana/ (ex: tools/tools.py, core/react_loop.py)"
+          },
+          "offset": {
+            "type": "integer",
+            "description": "Premiere ligne (1-indexed, defaut: 1)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Nombre max de lignes (defaut: 200)"
+          }
+        },
+        "required": ["path"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "run_code",
+      "description": "Execute du code Python dans la sandbox. Utilise pour des calculs, transformations de donnees, tests rapides. NE PAS utiliser pour des operations systeme (utiliser vm_exec) ou pour du code permanent (utiliser save_skill). Le code est execute dans un environnement restreint et temporaire.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Code Python a executer"
+          },
+          "language": {
+            "type": "string",
+            "description": "Langage (python par defaut)",
+            "default": "python"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Timeout en secondes (defaut: 30)",
+            "default": 30
+          }
+        },
+        "required": [
+          "code"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "github_list_files",
+      "description": "Liste les fichiers d'un depot GitHub.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Nom du depot (ex: proprietaire/repo)"
+          },
+          "path": {
+            "type": "string",
+            "description": "Chemin dans le depot (defaut: racine)"
+          }
+        },
+        "required": ["repo"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "github_read",
+      "description": "Lit un fichier depuis GitHub.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Nom du depot (ex: proprietaire/repo)"
+          },
+          "path": {
+            "type": "string",
+            "description": "Chemin du fichier"
+          }
+        },
+        "required": ["repo", "path"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "github_write",
+      "description": "Ecrit un fichier sur GitHub (cree ou met a jour).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "repo": {
+            "type": "string",
+            "description": "Nom du depot (ex: proprietaire/repo)"
+          },
+          "path": {
+            "type": "string",
+            "description": "Chemin du fichier"
+          },
+          "content": {
+            "type": "string",
+            "description": "Contenu du fichier"
+          },
+          "message": {
+            "type": "string",
+            "description": "Message de commit"
+          }
+        },
+        "required": ["repo", "path", "content", "message"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "cost_governor",
+      "description": "Gouverneur de cout : surveille et controle la consommation API. Actions : status (defaut), report, reset, set_budget. Utilise pour verifier le budget restant, le cout de la session, ou ajuster le budget.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": ["status", "report", "reset", "set_budget"],
+            "description": "Action (defaut: status)"
+          },
+          "budget": {
+            "type": "string",
+            "description": "Budget (pour set_budget, ex: 0.01)"
+          }
+        },
+        "required": ["action"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "youtube_info",
+      "description": "Extrait les metadonnees d'une video YouTube (titre, chaine, duree, description, date, vues). Peut aussi extraire la TRANSCRIPTION complete si include_transcript=true. Utilise yt-dlp sans telecharger la video.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "URL YouTube complete (https://youtu.be/... ou https://www.youtube.com/watch?v=...)"
+          },
+          "include_transcript": {
+            "type": "string",
+            "description": "Mettre 'true' pour obtenir la transcription complete de la video (sous-titres automatiques). Defaut: 'false'."
+          }
+        },
+        "required": ["url"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "fs_write",
+      "description": "Ecrit un fichier dans ~/santana/skills/ ou ~/santana/workspace/. Permet a Santana de creer ses propres skills, rapports, fichiers de configuration.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Chemin relatif depuis ~/santana/ (ex: skills/mon-skill.md, workspace/rapport.md)"
+          },
+          "content": {
+            "type": "string",
+            "description": "Contenu complet du fichier a ecrire"
+          }
+        },
+        "required": ["path", "content"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "skill_view",
+      "description": "Charge une skill depuis les fichiers .md dans ~/santana/skills/. Le contenu est injectable dans le contexte LLM.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Nom de la skill (sans .md)"
+          }
+        },
+        "required": ["name"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "skill_manage",
+      "description": "Cree, modifie ou supprime une skill en fichier .md dans ~/santana/skills/. Actions: create, patch, delete.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "create, patch ou delete"
+          },
+          "name": {
+            "type": "string",
+            "description": "Nom de la skill (sans .md)"
+          },
+          "content": {
+            "type": "string",
+            "description": "Contenu complet (requis pour create et patch)"
+          }
+        },
+        "required": ["action", "name"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "skill_list",
+      "description": "Liste toutes les skills disponibles dans ~/santana/skills/.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "delegate_task",
+      "description": "Delegue une tache a un sous-agent Santana isole (execution parallele). Utile pour traiter plusieurs questions en parallele ou effectuer une tache longue sans bloquer la conversation.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "goal": {
+            "type": "string",
+            "description": "Objectif precis de la tache deleguee"
+          },
+          "context": {
+            "type": "string",
+            "description": "Contexte additionnel (fichiers, contraintes, informations)"
+          }
+        },
+        "required": ["goal"]
+      }
+    }
+  }
+]

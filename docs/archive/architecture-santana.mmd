@@ -1,0 +1,257 @@
+graph TB
+    %% ============================================================
+    %% LÉGENDE
+    %% ============================================================
+    subgraph LEGEND[Légende]
+        direction LR
+        L_CORE(["🧠 Core Engine"])
+        L_MEM(["🧬 Memory System"])
+        L_TOOL(["🔧 Tools & Dispatchers"])
+        L_API(["🏗️ API Layer"])
+        L_EXT(["🌍 External Services"])
+        L_STO(["💾 Persistent Storage"])
+        L_BG(["⏰ Background Tasks"])
+
+        L_CORE -.-> L_MEM -.-> L_TOOL -.-> L_API -.-> L_EXT -.-> L_STO -.-> L_BG
+    end
+
+    %% ============================================================
+    %% ENTRY POINT
+    %% ============================================================
+    TG([📱 Telegram Bot]):::external
+    HM["hermes.py</br><i>Main entry point</i>"]:::core
+
+    TG -->|"webhook / polling"| HM
+
+    %% ============================================================
+    %% REACT LOOP
+    %% ============================================================
+    subgraph CORE[🧠 React Loop — Core Engine]
+        direction TB
+
+        RL[🔄 React Loop</br><i>Receive → Analyze → Act → Respond</i>]:::core
+
+        subgraph SP[📜 System Prompt Factory]
+            direction LR
+            SOUL[SOUL.md</br><i>Constitution</i>]:::core
+            USER[USER.md</br><i>User portrait</i>]:::core
+            RULES[RULES.md</br><i>Absolute laws</i>]:::core
+            SP_OUT[System Prompt</br>Assembled each turn]:::core
+            SOUL & USER & RULES --> SP_OUT
+        end
+
+        RL -->|"Injects"| SP_OUT
+        SP_OUT --> RL
+    end
+
+    HM -->|"Launch"| RL
+
+    %% ============================================================
+    %% MEMORY SYSTEM
+    %% ============================================================
+    subgraph MEM[🧬 Memory System]
+        direction TB
+
+        VM[Vector Memory Engine</br><i>sentence-transformers</i>]:::memory
+        SC[Semantic Cache</br><i>LRU — 20 entries</i>]:::memory
+        CL[2-Level Classifier</br><i>Facts / Decisions / Intentions</i>]:::memory
+
+        subgraph BOOKS[📚 Books — 5 topics]
+            B1[psychologie.md</br><i>Internal world</i>]:::memory
+            B2[famille.md</br><i>Relationships</i>]:::memory
+            B3[projets.md</br><i>Active projects</i>]:::memory
+            B4[vision_BTR.md</br><i>Company vision</i>]:::memory
+            B5[quête.md</br><i>Life quest</i>]:::memory
+        end
+
+        subgraph REG[📋 Registers — 3 structured]
+            R1[Registre: Décisions</br><i>[DÉCISION] tagged</i>]:::memory
+            R2[Registre: Personnes</br><i>Who, context, role</i>]:::memory
+            R3[Registre: Dates</br><i>Deadlines, milestones</i>]:::memory
+        end
+
+        FX[📝 Flux</br><i>Weekly journal</i>]:::memory
+
+        MS[🛡️ Memory Steward</br><i>Auto-writes after each message</i>]:::memory
+        GD[👁️ Guardian</br><i>Health monitor, cleanup, archive</i>]:::memory
+
+        MS -->|"Enrich"| B1 & B2 & B3 & B4 & B5
+        MS -->|"Log"| R1 & R2 & R3
+        MS -->|"Journal"| FX
+        GD -->|"Watch / Clean"| B1 & B2 & B3 & B4 & B5
+        GD -->|"Archive old"| ARCH
+    end
+
+    RL --->|"Query relevant context"| VM
+    VM --> SC
+    VM --> CL
+    CL --> B1 & B2 & B3 & B4 & B5
+
+    %% ============================================================
+    %% TOOL DISPATCHER
+    %% ============================================================
+    subgraph TOOLS[🔧 Central Tool Dispatcher]
+        direction TB
+
+        TD[Tool Dispatcher</br><i>Single router — all tools</i>]:::tool
+
+        subgraph NATIVE[🛠️ Native Tools — 9]
+            T1[🔍 Web Search</br><i>via Serper</i>]:::tool
+            T2[📖 Memory Read</br><i>Books / Registers / Flux</i>]:::tool
+            T3[✏️ Memory Write</br><i>via Steward</i>]:::tool
+            T4[🌐 Web Navigation</br><i>Playwright browser</i>]:::tool
+            T5[📸 Screenshot</br><i>Page capture</i>]:::tool
+            T6[📄 PDF Gen</br><i>Document generation</i>]:::tool
+            T7[⏰ Cron Manager</br><i>Schedule tasks</i>]:::tool
+            T8[📂 File Ops</br><i>Read / Write / Search</i>]:::tool
+            T9[🧠 Steward Invoke</br><i>Manual memory write</i>]:::tool
+        end
+
+        subgraph MCP[🧩 MCP Module]
+            direction TB
+            MCP_CLIENT[MCP Client</br><i>JSON-RPC native</i>]:::tool
+            MCP_SRV1[MCP Server 1</br><i>e.g. Notion</i>]:::tool
+            MCP_SRV2[MCP Server 2</br><i>e.g. Linear</i>]:::tool
+            MCP_SRVN[MCP Server N…</br><i>Infinite extension</i>]:::tool
+            MCP_CLIENT --> MCP_SRV1 & MCP_SRV2 & MCP_SRVN
+        end
+    end
+
+    RL -->|"Dispatch"| TD
+    TD --> T1 & T2 & T3 & T4 & T5 & T6 & T7 & T8 & T9
+    TD --> MCP_CLIENT
+
+    %% ============================================================
+    %% WEB NAVIGATOR
+    %% ============================================================
+    subgraph WEB[🌐 Web Navigator — Playwright]
+        WN[Playwright Browser</br><i>Port 5200</i>]:::tool
+        WN_AB[Anti-Bot Shield</br><i>Realistic UA, viewport</i>]:::tool
+        WN_SS[Headless Chrome</br><i>No GPU, no sandbox</i>]:::tool
+        WN --> WN_AB
+        WN_AB --> WN_SS
+    end
+
+    T4 --> WN
+
+    %% ============================================================
+    %% SPEECH
+    %% ============================================================
+    subgraph SPEECH[🎤 Speech]
+        WH[Whisper</br><i>Speech → Text</i>]:::tool
+    end
+
+    %% ============================================================
+    %% EXTERNAL SERVICES
+    %% ============================================================
+    subgraph EXT[🌍 External APIs]
+        DS[DeepSeek API</br><i>deepseek-chat</i>]:::external
+        SR[Serper API</br><i>Web Search</i>]:::external
+    end
+
+    RL --->|"LLM call"| DS
+    T1 ---> SR
+
+    %% ============================================================
+    %% API LAYER
+    %% ============================================================
+    subgraph API[🏗️ REST API — Flask]
+        API_SRV[api.py</br><i>Flask server</i>]:::api
+
+        subgraph BP[📐 Blueprints — 18 routes]
+            MB[🧠 memory_bp</br><i>/memory, /livres, flux, stats</i>]:::api
+            SB[⚙️ system_bp</br><i>/health, /status, /events, /logs</i>]:::api
+            CB[💬 chat_bp</br><i>/chat, /exec</i>]:::api
+            FB[📁 files_bp</br><i>/file, /deploy, /rollback</i>]:::api
+        end
+
+        API_SRV --> MB & SB & CB & FB
+
+        DASH[📊 Status Dashboard</br><i>/health → /status → /events</i>]:::api
+        SB --> DASH
+    end
+
+    %% ============================================================
+    %% CI & SECURITY
+    %% ============================================================
+    subgraph CI_SEC[⚡ CI & Security]
+        CI[🚦 ci-check.sh</br><i>47 tests — 2.58s</i>]:::bg
+        AS[🛡️ audit-security.sh</br><i>API key leak check</i>]:::bg
+        CI --> AS
+    end
+
+    %% ============================================================
+    %% BACKGROUND TASKS
+    %% ============================================================
+    subgraph BG[⏰ Background Tasks]
+        MG[👁️ Memory Guardian</br><i>Health, cleanup, dedup</i>]:::bg
+        WD[🐶 Watchdog</br><i>Service alive check</i>]:::bg
+        CR[📅 Cron Scheduler</br><i>Autonomous tasks</i>]:::bg
+        CR_TASKS[⚡ Cron Jobs</br><i>Report, monitor, act</i>]:::bg
+        CR --> CR_TASKS
+    end
+
+    HM ---> MG & WD & CR
+
+    %% ============================================================
+    %% PERSISTENT STORAGE
+    %% ============================================================
+    subgraph STO[💾 Persistent Storage]
+        FS1[📂 memory/books/</br><i>5 .md files</i>]:::storage
+        FS2[📂 memory/registers/</br><i>3 .md files</i>]:::storage
+        FS3[📂 memory/flux/</br><i>weekly.md</i>]:::storage
+        FS4[📂 memory/long_term/</br><i>Archived conversations</i>]:::storage
+        FS5[📂 memory/archives/</br><i>Compressed snapshots</i>]:::storage
+        FS6[🗄️ memory.db</br><i>Vector store</i>]:::storage
+        FS7[📂 crash-snapshots/</br><i>Post-crash diagnostics</i>]:::storage
+        ARCH[🗂️ long_term/</br><i>Historical archive</i>]:::storage
+    end
+
+    B1 & B2 & B3 & B4 & B5 ---> FS1
+    R1 & R2 & R3 ---> FS2
+    FX ---> FS3
+    ARCH ---> FS4 & FS5
+    VM ---> FS6
+
+    %% ============================================================
+    %% SYSTEMD INFRASTRUCTURE
+    %% ============================================================
+    subgraph SYS[🖥️ Systemd Service]
+        SD[hermes.service</br><i>systemd unit</i>]:::bg
+        WDT[⏲️ Watchdog timer</br><i>60s timeout</i>]:::bg
+        CRSH[💥 santana-crash-snapshot.sh</br><i>Dégradé mode</i>]:::bg
+        W4T[🔒 wait-for-telegram.sh</br><i>Token lock</i>]:::bg
+        RC[♻️ Restart logic</br><i>5 crash → degraded</i>]:::bg
+
+        SD --> WDT
+        SD --> CRSH
+        SD --> W4T
+        CRSH --> RC
+    end
+
+    HM ---> SD
+
+    %% ============================================================
+    %% DATA FLOW ANNOTATIONS
+    %% ============================================================
+    F1[/"User Message"/]:::flow
+    F2[/"LLM Response"/]:::flow
+    F3[/"Memory Context"/]:::flow
+    F4[/"Tool Result"/]:::flow
+
+    TG --> F1 --> RL
+    RL --> F2 --> TG
+    RL --> F3 --> DS
+    DS --> F4 --> RL
+
+    %% ============================================================
+    %% STYLING
+    %% ============================================================
+    classDef core fill:#e74c3c,color:#fff,stroke:#c0392b,stroke-width:2px
+    classDef memory fill:#1abc9c,color:#fff,stroke:#16a085,stroke-width:2px
+    classDef tool fill:#3498db,color:#fff,stroke:#2980b9,stroke-width:2px
+    classDef api fill:#9b59b6,color:#fff,stroke:#8e44ad,stroke-width:2px
+    classDef external fill:#e67e22,color:#fff,stroke:#d35400,stroke-width:2px
+    classDef storage fill:#f39c12,color:#fff,stroke:#d68910,stroke-width:2px
+    classDef bg fill:#7f8c8d,color:#fff,stroke:#6c7a7a,stroke-width:2px
+    classDef flow fill:none,stroke:#95a5a6,stroke-width:1px,stroke-dasharray:5 5

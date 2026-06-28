@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-timeout
+
+      - name: Lint — no bare except
+        run: |
+          ! grep -rn '^\s*except\s*:' *.py core/ tests/ tools/ hermes.py 2>/dev/null | grep -v test_
+
+      - name: Lint — rate limit decorator présent
+        run: |
+          python3 scripts/check_rate_limit.py
+
+      - name: Test — unitaires isolés
+        run: |
+          python -m pytest tests/ \
+            --ignore=tests/test_deepseek_client.py \
+            --ignore=tests/test_memory_steward.py \
+            -v --tb=short --timeout=60
+
+      - name: Test — compilation tous les .py
+        run: |
+          python3 scripts/check_compile.py
