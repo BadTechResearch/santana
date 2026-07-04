@@ -108,7 +108,7 @@
     "type": "function",
     "function": {
       "name": "web_navigate",
-      "description": "Ouvre une URL et extrait le contenu textuel. Utilise pour explorer des sites web, lire des articles, verifier des informations. Necessite un serveur MCP sur port 5200.",
+      "description": "Ouvre une URL et extrait le contenu textuel. Utilise pour explorer des sites web, lire des articles, verifier des informations. Moteur Chromium headless integre.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -127,7 +127,7 @@
     "type": "function",
     "function": {
       "name": "web_screenshot",
-      "description": "Capture d'ecran d'une URL. Utile pour voir le rendu visuel d'un site. Necessite un serveur MCP sur port 5200.",
+      "description": "Capture d'ecran d'une URL. Utile pour voir le rendu visuel d'un site. Moteur Chromium headless integre.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -545,6 +545,27 @@
           }
         },
         "required": ["goal"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "read_pdf",
+      "description": "Extrait le texte d'un fichier PDF. Utilise pour lire des documents, rapports, contrats, livres ou tout fichier PDF. Retourne le contenu page par page.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Chemin du fichier PDF (absolu ou relatif depuis ~/santana/)"
+          },
+          "max_chars": {
+            "type": "integer",
+            "description": "Nombre max de caracteres a extraire (defaut: 10000, max: 50000)"
+          }
+        },
+        "required": ["path"]
       }
     }
   }

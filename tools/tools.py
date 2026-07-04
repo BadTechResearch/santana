@@ -39,6 +39,10 @@ from tools.youtube import tool_youtube_info
 from tools.skills_manager import skill_view as _skill_view, skill_manage as _skill_manage, skill_list as _skill_list
 from core.delegate import delegate_task as _delegate_task_async
 
+# ─── Nouveaux outils (Playwright + PDF) ───────────────────────────────────
+from tools.browser import browser_navigate, browser_screenshot
+from tools.pdf_reader import read_pdf as _read_pdf_raw
+
 # ─── Modules @tool : enregistrement automatique via décorateur ───────────
 # Chaque import déclenche les décorateurs @tool() qui s'enregistrent
 # dans tools/registry.py.
@@ -142,32 +146,20 @@ def _tool_search_skills(query):
 
 
 def tool_web_navigate(url: str) -> str:
+    """Ouvre une URL et extrait le contenu textuel via Playwright (Chromium headless intégré)."""
     try:
-        r = requests.post("http://127.0.0.1:5200/navigate",
-            json={"url": url}, headers=_MCP_HEADERS, timeout=25)
-        data = r.json()
-        if data.get("status") == "ok":
-            title = data.get("title", "")
-            text = data.get("text", "")[:6000]
-            result = text
-            if title:
-                result = f"[{title}]\n{text}"
-            return result
-        return f"Erreur navigation: {data.get('text', '')}"
+        return browser_navigate(url)
     except Exception as e:
+        logging.error(f"[TOOL] web_navigate error: {e}")
         return f"Erreur web_navigate: {str(e)}"
 
 
 def tool_web_screenshot(url: str) -> str:
-    """Prend une capture d'écran d'une page web."""
+    """Prend une capture d'écran d'une page web via Playwright (Chromium headless intégré)."""
     try:
-        r = requests.post("http://127.0.0.1:5200/screenshot",
-            json={"url": url}, headers=_MCP_HEADERS, timeout=35)
-        data = r.json()
-        if data.get("status") == "ok":
-            return f"Capture: {data.get('path', '')}"
-        return f"Erreur screenshot: {data.get('text', '')}"
+        return browser_screenshot(url)
     except Exception as e:
+        logging.error(f"[TOOL] web_screenshot error: {e}")
         return f"Erreur web_screenshot: {str(e)}"
 
 
@@ -325,6 +317,23 @@ def tool_delegate_task(goal: str, context: str = "") -> str:
     return result.get("value", json.dumps({"error": "delegate_task: aucun résultat"}))
 
 
+def tool_read_pdf(path: str, max_chars: int = 10000) -> str:
+    """Extrait le texte d'un fichier PDF via pypdf.
+    
+    Args:
+        path: Chemin du PDF (absolu ou relatif depuis ~/santana/)
+        max_chars: Nombre max de caractères (défaut: 10000, max: 50000)
+    
+    Returns:
+        Texte extrait page par page
+    """
+    try:
+        return _read_pdf_raw(path, max_chars=max_chars)
+    except Exception as e:
+        logging.error(f"[TOOL] read_pdf error: {e}")
+        return f"Erreur lecture PDF: {str(e)}"
+
+
 # ─── REGISTRE ─────────────────────────────────────────────────────────────────
 
 # Enregistrement des outils via le nouveau registry (compatible legacy)
@@ -352,6 +361,7 @@ _reg_register("skill_view", _skill_view, arg_map={"name": "name"})
 _reg_register("skill_manage", _skill_manage, arg_map={"action": "action", "name": "name", "content": "content"}, defaults={"content": ""})
 _reg_register("skill_list", _skill_list, arg_map={})
 _reg_register("delegate_task", tool_delegate_task, arg_map={"goal": "goal", "context": "context"}, defaults={"context": ""})
+_reg_register("read_pdf", tool_read_pdf, arg_map={"path": "path", "max_chars": "max_chars"}, defaults={"max_chars": "10000"})
 
 # F9 — Gouverneur de coût (défini dans tools.json, dispatch dans cost_governor.py)
 from tools.cost_governor import cost_governor_dispatch as _cost_governor_dispatch

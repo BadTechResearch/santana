@@ -1,16 +1,21 @@
-# 🆘 SINBAD — Urgences
-bash ~/symbad/HEAL.sh
+# 🆘 Santana — Urgences
+
 ## Pannes fréquentes
+
 ### Service ne répond plus
-sudo systemctl restart symbad
+systemctl --user restart santana
+
 ### Rollback code
-cp ~/symbad/backups/snapshot-20260507-STABLE/symbad.py ~/symbad/symbad.py && sudo systemctl restart symbad
+cp ~/santana/backups/snapshot-STABLE/santana.py ~/santana/santana.py && systemctl --user restart santana
+
 ### Nouvelle version (safe)
-cat > /tmp/symbad_new.py << 'XEOF'
-<coller le nouveau code>
-XEOF
-bash ~/symbad/safe_edit.sh
+1. Créer un snapshot : cp -r ~/santana ~/santana-backup-$(date +%Y%m%d_%H%M)
+2. Appliquer les modifications
+3. Vérifier : cd ~/santana && venv_new/bin/python -c "compile(open('santana.py').read(), 'santana.py', 'exec')"
+4. Redémarrer : systemctl --user restart santana
+
 ### Disque plein
-sudo journalctl --vacuum-time=2d && df -h /
+journalctl --vacuum-time=2d && df -h /
+
 ### Tout gelé
 sudo reboot

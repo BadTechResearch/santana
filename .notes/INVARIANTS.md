@@ -1,9 +1,9 @@
-# INVARIANTS — Règles absolues de Bad Technology Research
+# INVARIANTS — Règles absolues de Santana
 
 Avant toute modification du système, vérifier que chaque invariant est respecté.
 
 ## 1. Réponse Telegram texte
-Symbad doit toujours répondre aux messages texte.
+Santana doit toujours répondre aux messages texte.
 - Si DeepSeek est down → "DeepSeek indisponible, réessaie dans un instant."
 - Si memory.db est corrompu → répondre sans mémoire.
 - Si un outil échoue → répondre avec les outils restants.
@@ -19,19 +19,18 @@ La page Statut de la PWA doit toujours se charger.
 - Même si un service est down → afficher son état réel.
 
 ## 4. Isolement des outils
-Un outil qui échoue ne doit jamais arrêter Symbad.
+Un outil qui échoue ne doit jamais arrêter Santana.
 - Chaque outil est wrappé (Fail-Soft).
-- Si un outil est down → Symbad continue avec les autres.
+- Si un outil est down → Santana continue avec les autres.
 
 ## 5. Aucune maintenance ne nécessite d'interface graphique
 Tout doit être faisable depuis un smartphone (SSH, Telegram, PWA).
 
 ## 6. Le cœur tourne sans Playwright
-Symbad fonctionne même si le service Playwright est arrêté.
+Santana fonctionne même si le moteur Chromium est arrêté.
 
 ## 7. Déploiement sans downtime
-Toute modification passe par safe_edit.sh.
-- Validation syntaxique avant redémarrage.
+Toute modification passe par vérification syntaxique avant redémarrage.
 - Rollback automatique si le service ne redémarre pas.
 
 ## 8. Données hors VM
@@ -46,11 +45,11 @@ Le code et la mémoire sont sauvegardés hors de la VM chaque jour.
 Toute modification majeure se fait via :
 - fichier temporaire
 - validation py_compile
-- backup automatique (safe_edit.sh)
+- backup automatique
 - rollback possible
 
 ### 2. Le moteur principal doit rester petit
-- hermes.py < 500 lignes
+- santana.py < 500 lignes
 - api.py < 300 lignes
 
 ### 3. Toute logique variable doit sortir du moteur
