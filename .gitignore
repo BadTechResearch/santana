@@ -6,12 +6,26 @@ venv_new/
 .harmony_env
 .hermes.lock
 
+# Configs personnelles (pas pour open-source)
+.claude.json
+.hermes/
+.telegram_restart.sh
+
+# Rapports & analyses personnels
+*.pdf
+
+# Scripts de déploiement personnel
+auto_update.sh
+deploy.sh
+
 # Bases de données
 *.db
 *.db-shm
 *.db-wal
 memory.db
 accounts.db
+santana.db
+skills/skills.db
 
 # Cache & builds
 __pycache__/
@@ -31,6 +45,8 @@ proactive_data.json
 
 # Sauvegardes
 backups/
+_backups/
+securise/
 *.bak*
 *.backup*
 
@@ -47,6 +63,16 @@ memory/livres_index.json
 .crash_snapshots/
 mcp_config.json
 CLAUDE.md
+
+# Skills personnels
+skills/profile-serge.md
+
+# Scripts opérationnels personnels
+scripts/backup_*.sh
+scripts/safe_edit.sh
+scripts/santana-crash-snapshot.sh
+scripts/cleanup-console.sh
+scripts/wait-for-telegram.sh
 
 # Documents personnels
 workspace/
