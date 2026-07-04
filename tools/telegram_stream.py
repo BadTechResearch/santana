@@ -16,6 +16,7 @@ Convention de préfixes utilisée par react_loop.py :
 
 import asyncio
 import logging
+import re
 import time
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,43 @@ _MSGTYPE_LABEL = {
     "DEEP": "🧠 ",
     "PERSONNEL": "",
 }
+
+
+def _markdown_to_telegram_html(text: str) -> str:
+    """Convertit le Markdown que produit Santana (le prompt système lui
+    demande **gras**, ## titres, listes, `code`) en HTML Telegram.
+
+    Pourquoi HTML plutôt que MarkdownV2 : Telegram n'exige d'échapper que
+    3 caractères (&, <, >) contre une dizaine en MarkdownV2 (_ * [ ] ( ) ~
+    ` > # + - = | { } . !) — un seul caractère non échappé dans du texte
+    généré par LLM fait échouer l'envoi ENTIER du message en MarkdownV2.
+    En HTML, échapper d'abord puis n'introduire que des balises qu'on
+    contrôle nous-mêmes élimine ce risque par construction.
+    """
+    # 1. Échapper les caractères spéciaux HTML AVANT d'introduire nos propres balises
+    escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    # 2. Titres Markdown (## / ###) en début de ligne -> gras (Telegram HTML n'a pas de <h1>)
+    escaped = re.sub(r"^#{1,6}\s+(.+)$", r"<b>\1</b>", escaped, flags=re.MULTILINE)
+
+    # 3. Gras **texte** -> <b>texte</b> (non-greedy, avant l'italique simple
+    #    pour ne pas confondre les deux étoiles d'un ** avec deux * simples)
+    escaped = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", escaped)
+
+    # 4. Code `texte` -> <code>texte</code>
+    escaped = re.sub(r"`([^`\n]+?)`", r"<code>\1</code>", escaped)
+
+    # 5. Italique *texte* ou _texte_ restant -> <i>texte</i>
+    escaped = re.sub(r"(?<!\*)\*([^*\n]+?)\*(?!\*)", r"<i>\1</i>", escaped)
+    escaped = re.sub(r"(?<!_)_([^_\n]+?)_(?!_)", r"<i>\1</i>", escaped)
+
+    return escaped
+
+
+def _strip_html_tags(text: str) -> str:
+    """Repli texte brut : retire les balises et dé-échappe les entités."""
+    plain = re.sub(r"</?(?:b|i|code|pre|u|s)>", "", text)
+    return plain.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
 
 
 def _split_for_telegram(text: str, limit: int = _MAX_MSG_LEN) -> list[str]:
@@ -127,29 +165,53 @@ class TelegramStream:
                 # le prochain chunk ou finalize() rattrapera l'affichage.
                 logger.debug("[TG_STREAM] Édition ignorée: %s", e)
 
-    async def finalize(self, response: str):
-        """Envoie la réponse finale, propre (sans curseur), en la découpant
-        si elle dépasse la limite Telegram. Remplace le brouillon en cours
-        d'édition par le texte définitif."""
-        response = response or "…"
-        parts = _split_for_telegram(response)
-
+    async def _send_or_edit(self, index: int, text: str):
+        """Envoie/édite UNE partie avec mise en forme HTML, et se replie en
+        texte brut (sans balises) si Telegram rejette le HTML (tags mal
+        formés que la conversion n'aurait pas dû produire, mais mieux vaut
+        livrer un message lisible que ne rien livrer)."""
+        html = _markdown_to_telegram_html(text)
+        is_first_edit = index == 0 and self.message_id is not None
         try:
-            if self.message_id is not None:
+            if is_first_edit:
                 await self.bot.edit_message_text(
-                    chat_id=self.chat_id, message_id=self.message_id, text=parts[0]
+                    chat_id=self.chat_id, message_id=self.message_id,
+                    text=html, parse_mode="HTML",
                 )
             else:
-                await self.bot.send_message(chat_id=self.chat_id, text=parts[0])
+                msg = await self.bot.send_message(
+                    chat_id=self.chat_id, text=html, parse_mode="HTML",
+                )
+                if index == 0:
+                    self.message_id = msg.message_id
+            return
         except Exception as e:
-            logger.warning("[TG_STREAM] Échec édition finale, envoi en nouveau message: %s", e)
-            try:
-                await self.bot.send_message(chat_id=self.chat_id, text=parts[0])
-            except Exception as e2:
-                logger.error("[TG_STREAM] Échec envoi final: %s", e2)
+            logger.warning("[TG_STREAM] HTML rejeté, repli texte brut (%s)", e)
 
-        for part in parts[1:]:
-            try:
-                await self.bot.send_message(chat_id=self.chat_id, text=part)
-            except Exception as e:
-                logger.error("[TG_STREAM] Échec envoi partie supplémentaire: %s", e)
+        plain = _strip_html_tags(html)
+        try:
+            if is_first_edit:
+                await self.bot.edit_message_text(
+                    chat_id=self.chat_id, message_id=self.message_id, text=plain,
+                )
+            else:
+                await self.bot.send_message(chat_id=self.chat_id, text=plain)
+        except Exception as e2:
+            logger.error("[TG_STREAM] Échec envoi (HTML et texte brut): %s", e2)
+
+    async def finalize(self, response: str):
+        """Envoie la réponse finale, propre (sans curseur), en la découpant
+        si elle dépasse la limite Telegram et en appliquant le formatage
+        HTML (jamais pendant le streaming — le texte partiel a des balises
+        Markdown non fermées, ce qui casserait le parsing à chaque édition).
+        Remplace le brouillon en cours d'édition par le texte définitif."""
+        response = response or "…"
+        label = _MSGTYPE_LABEL.get(self.msg_type, "")
+        if label and not response.startswith(label):
+            response = label + response
+        # Découper le texte BRUT (pas le HTML) pour que chaque partie garde
+        # ses propres balises **/`` équilibrées — pas de <b> ouvert dans une
+        # partie et fermé dans la suivante.
+        parts = _split_for_telegram(response)
+        for i, part in enumerate(parts):
+            await self._send_or_edit(i, part)

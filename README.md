@@ -1,4 +1,4 @@
-# 🦞 Santana — Autonomous AI Agent
+# 🎸 Santana — Autonomous AI Agent
 
 > *"An agent that remembers, learns, and improves itself."*
 

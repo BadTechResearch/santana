@@ -79,13 +79,14 @@ from tools.telegram_stream import TelegramStream
 
 async def start_command(update: Update, context):
     await update.message.reply_text(
-        "🦞 *Santana* — Agent personnel de Serge\n\n"
-        "Je suis ton assistant IA. Envoie-moi un message, je réponds.\n\n"
-        "Commandes disponibles :\n"
-        "/start — Démarrer / menu\n"
-        "/reset — Nettoyer la session\n"
-        "/status — Statut système\n"
-        "/help — Aide"
+        "🎸 <b>Santana</b> — Agent personnel de Serge\n\n"
+        "✨ Je suis ton assistant IA. Envoie-moi un message, je réponds.\n\n"
+        "📋 <b>Commandes disponibles :</b>\n"
+        "🔄 /start — Démarrer / menu\n"
+        "🧹 /reset — Nettoyer la session\n"
+        "📊 /status — Statut système\n"
+        "🤝 /help — Aide",
+        parse_mode="HTML",
     )
 
 
@@ -95,14 +96,15 @@ async def status_command(update: Update, context):
 
 async def help_command(update: Update, context):
     await update.message.reply_text(
-        "🤝 *Aide Santana*\n\n"
-        "Envoie-moi un message texte, je te réponds avec ma boucle ReAct.\n"
-        "Je peux chercher sur le web, exécuter du code, consulter ma mémoire.\n\n"
-        "Commandes :\n"
-        "/start — Démarrer\n"
-        "/reset — Nettoyer la session (reset budget + buffer)\n"
-        "/status — Voir le statut\n"
-        "/help — Cette aide"
+        "🤝 <b>Aide Santana</b>\n\n"
+        "💬 Envoie-moi un message texte, je te réponds avec ma boucle ReAct.\n"
+        "🔍 Je peux chercher sur le web, exécuter du code, consulter ma mémoire.\n\n"
+        "📋 <b>Commandes :</b>\n"
+        "🔄 /start — Démarrer\n"
+        "🧹 /reset — Nettoyer la session (reset budget + buffer)\n"
+        "📊 /status — Voir le statut\n"
+        "🤝 /help — Cette aide",
+        parse_mode="HTML",
     )
 
 
@@ -114,12 +116,13 @@ async def reset_command(update: Update, context):
         _reset_context_session()
         apres = _cost_status()
         await update.message.reply_text(
-            f"🧹 *Session nettoyée* ✅\n\n"
-            f"Budget : `${apres['budget']:.4f}`\n"
-            f"Utilisé : `${apres['cout_cumule']:.4f}`\n"
-            f"Niveau : `{apres['niveau']}`\n"
-            f"Appels LLM : `{apres['appels']}`\n\n"
-            f"Tu peux maintenant reparler, le compteur est reparti à zéro."
+            f"🧹 <b>Session nettoyée</b> ✅\n\n"
+            f"💰 Budget : <code>${apres['budget']:.4f}</code>\n"
+            f"📉 Utilisé : <code>${apres['cout_cumule']:.4f}</code>\n"
+            f"🚦 Niveau : <code>{apres['niveau']}</code>\n"
+            f"⚡ Appels LLM : <code>{apres['appels']}</code>\n\n"
+            f"✅ Tu peux maintenant reparler, le compteur est reparti à zéro.",
+            parse_mode="HTML",
         )
     except Exception as e:
         logging.error(f"[RESET] Erreur: {e}")
