@@ -131,6 +131,7 @@ _TOOLS_BY_TYPE = {
     "SYNTHESE": ["search", "memory"],
     "DEEP":     ["search", "memory", "code", "meta"],
     "PERSONNEL": ["search", "memory", "code", "meta", "github"],
+    "SOCIAL": [],
 }
 
 # Cache du prompt système : 26K chars reconstruits à chaque message sinon

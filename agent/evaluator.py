@@ -3,16 +3,16 @@
 Évalue la qualité de chaque réponse (pertinence, ton, structure, troncature).
 Stocke les scores en mémoire pour analyse et amélioration continue.
 Pas de boucle corrective active — phase passive seulement.
+Stockage SQLite (metrics.db) via core/db.get_metrics_db().
 """
 
 import json
 import logging
-import os
 import re
 import sqlite3
 from datetime import datetime
 
-BASE_DIR = os.path.expanduser("~/santana")
+from core.db import get_metrics_db
 
 
 class EvaluationResult:
@@ -175,7 +175,6 @@ def evaluator_summary(result: EvaluationResult) -> str:
 
 # ── Stockage des évaluations (SQLite, metrics.db) ─────────────────────
 
-EVAL_DB = os.path.join(BASE_DIR, "metrics.db")
 _EVAL_HISTORY: list[EvaluationResult] = []
 
 
@@ -183,11 +182,10 @@ def _load_history():
     """Charge l'historique depuis SQLite au démarrage."""
     global _EVAL_HISTORY
     try:
-        conn = sqlite3.connect(EVAL_DB, timeout=5)
+        conn = get_metrics_db()
         c = conn.cursor()
         c.execute("SELECT score, message, reponse, timestamp, metriques FROM evaluations ORDER BY id DESC LIMIT 100")
         rows = c.fetchall()
-        conn.close()
         _EVAL_HISTORY = []
         for score, message, reponse, ts, metriques in rows:
             details = json.loads(metriques) if metriques else {}
@@ -203,7 +201,7 @@ def _load_history():
 def _save_history():
     """Sauvegarde l'historique dans SQLite."""
     try:
-        conn = sqlite3.connect(EVAL_DB, timeout=5)
+        conn = get_metrics_db()
         # Clear et réinsérer (max 100)
         conn.execute("DELETE FROM evaluations")
         for e in _EVAL_HISTORY[-100:]:
@@ -214,7 +212,6 @@ def _save_history():
                  d.get("timestamp", ""), json.dumps(d.get("details", {})))
             )
         conn.commit()
-        conn.close()
     except Exception as e:
         logging.warning(f"[EVAL] Save error: {e}")
 

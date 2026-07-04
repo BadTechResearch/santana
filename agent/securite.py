@@ -1,9 +1,8 @@
-"""
-Sécurité pour Santana (F9).
+"""Sécurité pour Santana (F9).
 
 Rate-limiting : limite le nombre d'appels par clé et par fenêtre de temps.
 Audit des accès : log structuré de toutes les tentatives d'accès.
-Stockage SQLite (metrics.db).
+Stockage SQLite (metrics.db) via core/db.get_metrics_db().
 
 (Migré JSON→SQLite le 20 juin 2026.)
 """
@@ -11,15 +10,14 @@ Stockage SQLite (metrics.db).
 import json
 import logging
 import os
-import sqlite3
 import threading
 import time
 from datetime import datetime, timezone
 
+from core.db import get_metrics_db
+
 logger = logging.getLogger(__name__)
 
-BASE_DIR = os.path.expanduser("~/santana")
-DB_PATH = os.path.join(BASE_DIR, "metrics.db")
 MAX_AUDIT_ENTRIES = 5_000
 
 _lock = threading.Lock()
@@ -41,11 +39,10 @@ def _ensure_loaded():
     if _cache and time.time() - _cache_ts < _CACHE_TTL:
         return
     try:
-        conn = sqlite3.connect(DB_PATH, timeout=5)
+        conn = get_metrics_db()
         c = conn.cursor()
         c.execute("SELECT cle, timestamps FROM ratelimit")
         _cache = {row[0]: json.loads(row[1]) for row in c.fetchall()}
-        conn.close()
         _cache_ts = time.time()
     except Exception as e:
         logger.error("[SECURITE] Erreur chargement ratelimit: %s", e)
@@ -55,14 +52,13 @@ def _ensure_loaded():
 def _flush_ratelimit():
     """Sauvegarde le cache dans SQLite."""
     try:
-        conn = sqlite3.connect(DB_PATH, timeout=5)
+        conn = get_metrics_db()
         for key, timestamps in _cache.items():
             conn.execute(
                 "INSERT OR REPLACE INTO ratelimit (cle, timestamps) VALUES (?, ?)",
                 (key, json.dumps(timestamps))
             )
         conn.commit()
-        conn.close()
     except Exception as e:
         logger.error("[SECURITE] Erreur sauvegarde ratelimit: %s", e)
 
@@ -112,7 +108,7 @@ def _now_iso() -> str:
 def log_access(utilisateur: str, action: str, statut: str) -> dict:
     ts = _now_iso()
     try:
-        conn = sqlite3.connect(DB_PATH, timeout=5)
+        conn = get_metrics_db()
         conn.execute(
             "INSERT INTO securite_audit (timestamp, utilisateur, action, statut) VALUES (?, ?, ?, ?)",
             (ts, utilisateur, action, statut)
@@ -122,7 +118,6 @@ def log_access(utilisateur: str, action: str, statut: str) -> dict:
             (MAX_AUDIT_ENTRIES,)
         )
         conn.commit()
-        conn.close()
     except Exception as e:
         logger.error("[SECURITE] Audit SQLite error: %s", e)
 

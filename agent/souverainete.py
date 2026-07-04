@@ -1,22 +1,19 @@
-"""
-Souveraineté — Surveillance des appels externes de Santana (F10).
+"""Souveraineté — Surveillance des appels externes de Santana (F10).
 
 Audit en temps réel : chaque appel à une API externe est enregistré pour
-traçabilité. Stockage SQLite (metrics.db) — plus de JSON synchrone sous
-verrou qui bloquait le chemin chaud.
+traçabilité. Stockage SQLite (metrics.db) via core/db.get_metrics_db().
 
 (Migré JSON→SQLite le 20 juin 2026.)
 """
 
 import logging
-import os
 import sqlite3
 from datetime import datetime, timezone
 
+from core.db import get_metrics_db
+
 logger = logging.getLogger(__name__)
 
-BASE_DIR = os.path.expanduser("~/santana")
-DB_PATH = os.path.join(BASE_DIR, "metrics.db")
 MAX_ENTRIES = 2_000
 
 
@@ -44,7 +41,7 @@ def surveiller_appel_externe(url: str, contexte: str = "") -> dict:
     ts = datetime.now(timezone.utc).isoformat()
 
     try:
-        conn = sqlite3.connect(DB_PATH, timeout=5)
+        conn = get_metrics_db()
         conn.execute(
             "INSERT INTO souverainete (timestamp, url, host, contexte, connu) VALUES (?, ?, ?, ?, ?)",
             (ts, url[:200], host, contexte[:100], connu)
@@ -55,7 +52,6 @@ def surveiller_appel_externe(url: str, contexte: str = "") -> dict:
             (MAX_ENTRIES,)
         )
         conn.commit()
-        conn.close()
     except Exception as e:
         logger.warning("[SOUVERAINETE] SQLite error: %s", e)
 

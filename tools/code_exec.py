@@ -63,7 +63,7 @@ def _write_script(workdir: str, code: str, lang: str) -> str:
     return script_path
 
 
-def _build_command(lang: str, script_path: str) -> list[str]:
+def _build_command(lang: str, script_path: str, timeout_sec: int = 30) -> list[str]:
     """Construit la commande d'exécution avec timeout, ulimit et isolation réseau.
 
     Isolation réseau via `unshare --user --map-root-user --net` (namespace réseau
@@ -77,7 +77,7 @@ def _build_command(lang: str, script_path: str) -> list[str]:
     info = SUPPORTED_LANGUAGES.get(lang)
     shell_cmd = f"ulimit -v {MEMORY_LIMIT} && {' '.join(info['command'])} {shlex_quote(script_path)}"
     return [
-        "timeout", str(DEFAULT_TIMEOUT),
+        "timeout", str(timeout_sec),
         "unshare", "--user", "--map-root-user", "--mount", "--propagation", "private", "--net",
         "bash", "-c", shell_cmd,
     ]
@@ -114,7 +114,7 @@ def run_code(code: str, language: str = "python", timeout=None) -> str:
         script_path = _write_script(workdir, code, language)
 
         # Construire et lancer la commande
-        cmd = _build_command(language, script_path)
+        cmd = _build_command(language, script_path, timeout_sec=actual_timeout)
         logger.info(f"[CODEXEC] Lancement: {language}, timeout={actual_timeout}s")
 
         result = subprocess.run(

@@ -2,6 +2,7 @@
 
 Enregistrement des résultats d'outils, détection d'échecs,
 auto-réparation et notification.
+Stockage SQLite (metrics.db) via core/db.get_metrics_db().
 
 (Condensé le 20 juin 2026 : supprimé health_check, detect_propagation,
 suggest_specialist, delegate_to, get_delegations, complete_delegation —
@@ -11,15 +12,14 @@ get_failure_status et leurs helpers.)
 
 import json
 import logging
-import os
 import sqlite3
 import subprocess
 from datetime import datetime
 
+from core.db import get_metrics_db
+
 logger = logging.getLogger(__name__)
 
-BASE_DIR = os.path.expanduser("~/santana")
-DB_PATH = os.path.join(BASE_DIR, "metrics.db")
 STATE_KEY = "orchestration_failures"
 
 FAILURE_THRESHOLD = 3
@@ -45,11 +45,10 @@ COMPONENT_SERVICE = {
 def _load_failures() -> dict:
     """Charge l'état depuis SQLite (metrics.db)."""
     try:
-        conn = sqlite3.connect(DB_PATH, timeout=5)
+        conn = get_metrics_db()
         c = conn.cursor()
         c.execute("SELECT value FROM tool_state WHERE key=?", (STATE_KEY,))
         row = c.fetchone()
-        conn.close()
         if row:
             return json.loads(row[0])
     except Exception as e:
@@ -57,16 +56,15 @@ def _load_failures() -> dict:
     return {"outils": {}, "reparations": []}
 
 
-def _save_failures(data: dict) -> None:
-    """Sauvegarde atomique dans SQLite."""
+def _save_failures(state: dict) -> None:
+    """Persiste l'état dans SQLite."""
     try:
-        conn = sqlite3.connect(DB_PATH, timeout=5)
+        conn = get_metrics_db()
         conn.execute(
             "INSERT OR REPLACE INTO tool_state (key, value) VALUES (?, ?)",
-            (STATE_KEY, json.dumps(data, ensure_ascii=False))
+            (STATE_KEY, json.dumps(state, ensure_ascii=False))
         )
         conn.commit()
-        conn.close()
     except Exception as e:
         logger.warning("[ORCHESTRATION] Save failures error: %s", e)
 

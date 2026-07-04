@@ -310,10 +310,10 @@ def register_all():
     """Enregistre tous les outils GitHub dans le registre Santana."""
     from tools.tools import _register
 
-    _register("github_list_repos", tool_github_list_repos, {})
-    _register("github_list_files", tool_github_list_files, {"repo": "repo", "path": "path"})
-    _register("github_read", tool_github_read, {"repo": "repo", "path": "path", "max_chars": "max_chars"})
-    _register("github_write", tool_github_write, {
+    _register("github_list_repos", tool_github_list_repos, arg_map={})
+    _register("github_list_files", tool_github_list_files, arg_map={"repo": "repo", "path": "path"})
+    _register("github_read", tool_github_read, arg_map={"repo": "repo", "path": "path", "max_chars": "max_chars"})
+    _register("github_write", tool_github_write, arg_map={
         "repo": "repo", "path": "path",
         "content": "content", "message": "message"
     })

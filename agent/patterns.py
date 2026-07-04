@@ -3,31 +3,29 @@
 Détection de routines, anomalies, modélisation utilisateur,
 et correction lock-in (erreurs corrigées ne se reproduisent pas).
 
-Stockage dans ~/santana/pattern_data.json
+Stockage SQLite (metrics.db) via core/db.get_metrics_db().
 """
 
 import json
 import logging
-import os
 import sqlite3
 from collections import defaultdict
 from datetime import datetime, timedelta
 
+from core.db import get_metrics_db
+
 logger = logging.getLogger(__name__)
 
-BASE_DIR = os.path.expanduser("~/santana")
-DB_PATH = os.path.join(BASE_DIR, "metrics.db")
 STATE_KEY = "pattern_data"
 
 
 def _load() -> dict:
     """Charge depuis SQLite."""
     try:
-        conn = sqlite3.connect(DB_PATH, timeout=5)
+        conn = get_metrics_db()
         c = conn.cursor()
         c.execute("SELECT value FROM tool_state WHERE key=?", (STATE_KEY,))
         row = c.fetchone()
-        conn.close()
         if row:
             return json.loads(row[0])
     except Exception as e:
@@ -38,13 +36,12 @@ def _load() -> dict:
 def _save(data: dict) -> None:
     """Sauvegarde atomique dans SQLite."""
     try:
-        conn = sqlite3.connect(DB_PATH, timeout=5)
+        conn = get_metrics_db()
         conn.execute(
             "INSERT OR REPLACE INTO tool_state (key, value) VALUES (?, ?)",
             (STATE_KEY, json.dumps(data, ensure_ascii=False))
         )
         conn.commit()
-        conn.close()
     except Exception as e:
         logger.warning("[PATTERNS] Save error: %s", e)
 

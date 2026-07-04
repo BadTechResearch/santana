@@ -1,7 +1,18 @@
-"""Gouverneur de coût pour Santana (F9 de la roadmap).
+"""Gouverneur de coût pour Santana — basé sur la consommation RÉELLE DeepSeek V4 Flash.
 
-Contrôleur de budget : suit le coût cumulé de la session LLM en cours et
-applique trois seuils pour protéger le budget mensuel (≤ €10/mois, verrou Serge).
+Deux mécanismes complémentaires :
+
+1. **Pré-check (garde-fou)** : avant chaque appel LLM, `check_cost_governor()` estime
+   le coût du prochain appel à partir de la taille des messages. Si le budget projeté
+   dépasse ALERT (80%) / THROTTLE (95%) / STOP (100%), l'appel est dégradé ou bloqué.
+
+2. **Suivi réel (comptabilité)** : après chaque appel API réussi, `record_usage()` est
+   appelée par `core/provider.py` avec les tokens RÉELS retournés par l'API DeepSeek
+   (prompt_tokens, completion_tokens, cached_tokens). Le coût est calculé avec les
+   vrais prix DeepSeek V4 Flash :
+     - Input cache miss : $0.14 / 1M tokens
+     - Input cache hit  : $0.0028 / 1M tokens (×50 moins cher)
+     - Output           : $0.28 / 1M tokens
 
 Seuils (en pourcentage du budget) :
 - ALERT     (80 %)  → log d'avertissement, on continue normalement
@@ -9,11 +20,6 @@ Seuils (en pourcentage du budget) :
 - STOP      (100 %) → on refuse les appels LLM coûteux, mode dégradé
 
 Le budget par défaut vient de DEEPSEEK_COST_LIMIT dans .env (défaut 0.01 = 0,01 $).
-DeepSeek V4 Flash coûte ¥1 / 1M tokens ; le prix par 1M tokens en USD est
-configurable via DEEPSEEK_PRICE_PER_1M_USD (défaut 0.14).
-
-Le coût est volontairement estimé (pas de relevé exact par l'API) : l'objectif
-est un garde-fou conservateur, pas une comptabilité au centime.
 """
 
 import json
@@ -24,6 +30,13 @@ import threading
 logger = logging.getLogger(__name__)
 
 # ─── Configuration ──────────────────────────────────────────────────────────
+
+# Prix réels DeepSeek V4 Flash (vérifiés via API le 04/07/2026)
+# Source : https://api-docs.deepseek.com/quick_start/pricing
+PRIX_INPUT_CACHE_MISS = 0.14    # $ / 1M tokens — prompt cache miss
+PRIX_OUTPUT = 0.28              # $ / 1M tokens — completion (inclut reasoning)
+PRIX_CACHE_HIT = 0.0028        # $ / 1M tokens — prompt cache hit (×50 moins cher)
+
 
 def _read_budget() -> float:
     """Lit le budget de session depuis DEEPSEEK_COST_LIMIT (défaut 0.01 $)."""
@@ -51,9 +64,15 @@ SEUIL_STOP = 1.00
 
 _lock = threading.Lock()
 _state = {
-    "cout_cumule": 0.0,     # coût cumulé estimé de la session ($)
+    "cout_cumule": 0.0,          # coût cumulé estimé de la session ($)
+    "cout_cumule_reel": 0.0,     # coût cumulé réel (depuis record_usage)
     "budget": _read_budget(),
-    "appels": 0,            # nombre d'appels LLM comptabilisés
+    "appels": 0,                 # nombre d'appels LLM comptabilisés (estimés)
+    "total_appels_reussis": 0,   # appels API réellement réussis
+    "total_tokens_prompt": 0,
+    "total_tokens_completion": 0,
+    "total_tokens_cache": 0,
+    "taux_cache_moyen": 0.0,
     "dernier_niveau": "OK",
 }
 
@@ -63,6 +82,70 @@ def estimate_cost_from_tokens(input_tokens: int, output_tokens: int = 0) -> floa
     price = _read_price_per_1m()
     total_tokens = max(0, input_tokens) + max(0, output_tokens)
     return (total_tokens / 1_000_000.0) * price
+
+
+def _calculer_cout_reel(prompt_tokens: int, completion_tokens: int, cached_tokens: int) -> dict:
+    """Calcule le coût réel d'un appel DeepSeek à partir des tokens retournés par l'API.
+
+    DeepSeek V4 Flash facture :
+      - Input (cache miss) : $0.14 / 1M tokens
+      - Input (cache hit)  : $0.0028 / 1M tokens (×50 moins cher)
+      - Output             : $0.28 / 1M tokens (inclut le reasoning)
+
+    Args:
+        prompt_tokens: tokens d'entrée totaux (cache miss + cache hit)
+        completion_tokens: tokens de sortie
+        cached_tokens: tokens d'entrée servis depuis le cache DeepSeek
+
+    Returns:
+        dict avec cout_input, cout_output, cout_total (en $)
+    """
+    miss = max(0, prompt_tokens - cached_tokens)
+    cout_input = (miss / 1_000_000.0) * PRIX_INPUT_CACHE_MISS
+    cout_input += (cached_tokens / 1_000_000.0) * PRIX_CACHE_HIT
+    cout_output = (completion_tokens / 1_000_000.0) * PRIX_OUTPUT
+    cout_total = round(cout_input + cout_output, 8)
+    return {
+        "cout_input": round(cout_input, 8),
+        "cout_output": round(cout_output, 8),
+        "cout_total": cout_total,
+        "taux_cache": round(cached_tokens / max(1, prompt_tokens) * 100, 1),
+    }
+
+
+def record_usage(prompt_tokens: int, completion_tokens: int,
+                 cached_tokens: int = 0, provider_name: str = "deepseek"):
+    """Enregistre la consommation RÉELLE de tokens retournée par l'API LLM.
+
+    Appelée par core/provider.py après chaque appel API réussi.
+    Remplace l'estimation pré-appel par le coût réel.
+    Persiste dans metrics.db pour le suivi mensuel.
+
+    Args:
+        prompt_tokens: tokens d'entrée réels (retour API)
+        completion_tokens: tokens de sortie réels
+        cached_tokens: tokens servis depuis le cache DeepSeek
+        provider_name: nom du provider utilisé ('deepseek', 'nous', 'openrouter')
+    """
+    cout = _calculer_cout_reel(prompt_tokens, completion_tokens, cached_tokens)
+    with _lock:
+        _state["cout_cumule_reel"] = round(
+            _state.get("cout_cumule_reel", 0.0) + cout["cout_total"], 8
+        )
+        _state["total_tokens_prompt"] = _state.get("total_tokens_prompt", 0) + prompt_tokens
+        _state["total_tokens_completion"] = _state.get("total_tokens_completion", 0) + completion_tokens
+        _state["total_tokens_cache"] = _state.get("total_tokens_cache", 0) + cached_tokens
+        _state["total_appels_reussis"] = _state.get("total_appels_reussis", 0) + 1
+        _state["taux_cache_moyen"] = round(
+            (_state["total_tokens_cache"] / max(1, _state["total_tokens_prompt"])) * 100, 1
+        )
+
+    logger.info(
+        "[COST] Réel: %dp + %dc (%d cache) = %.6f$ (cumul: %.6f$, %d appels, cache %s%%)",
+        prompt_tokens, completion_tokens, cached_tokens,
+        cout["cout_total"], _state["cout_cumule_reel"],
+        _state["total_appels_reussis"], cout["taux_cache"],
+    )
 
 
 def estimate_cost_from_messages(messages: list, max_output_tokens: int = 0) -> float:
@@ -147,6 +230,7 @@ def get_status() -> dict:
     with _lock:
         budget = _state["budget"] or _read_budget()
         cumule = _state["cout_cumule"]
+        cumule_reel = _state.get("cout_cumule_reel", 0.0)
         ratio = cumule / budget if budget > 0 else 1.0
         if ratio >= SEUIL_STOP:
             niveau = "STOP"
@@ -158,11 +242,17 @@ def get_status() -> dict:
             niveau = "OK"
         return {
             "niveau": niveau,
-            "cout_cumule": round(cumule, 6),
+            "cout_cumule_estime": round(cumule, 6),
+            "cout_cumule_reel": round(cumule_reel, 8),
             "budget": round(budget, 6),
-            "pourcentage": round(ratio * 100, 1),
-            "appels": _state["appels"],
-            "restant": round(max(0.0, budget - cumule), 6),
+            "pourcentage_estime": round(ratio * 100, 1),
+            "appels_estimes": _state["appels"],
+            "appels_reussis": _state.get("total_appels_reussis", 0),
+            "tokens_prompt": _state.get("total_tokens_prompt", 0),
+            "tokens_completion": _state.get("total_tokens_completion", 0),
+            "tokens_cache": _state.get("total_tokens_cache", 0),
+            "taux_cache_moyen": _state.get("taux_cache_moyen", 0.0),
+            "restant": round(max(0.0, budget - cumule_reel), 8),
         }
 
 
@@ -170,7 +260,13 @@ def reset() -> dict:
     """Réinitialise le coût cumulé de la session (garde le budget)."""
     with _lock:
         _state["cout_cumule"] = 0.0
+        _state["cout_cumule_reel"] = 0.0
         _state["appels"] = 0
+        _state["total_appels_reussis"] = 0
+        _state["total_tokens_prompt"] = 0
+        _state["total_tokens_completion"] = 0
+        _state["total_tokens_cache"] = 0
+        _state["taux_cache_moyen"] = 0.0
         _state["dernier_niveau"] = "OK"
     logger.info("[COST] Compteur de session réinitialisé")
     return get_status()

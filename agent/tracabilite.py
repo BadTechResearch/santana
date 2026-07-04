@@ -1,21 +1,19 @@
-"""
-Traçabilité pour Santana (F8).
+"""Traçabilité pour Santana (F8).
 
-Log structuré des actions. Stockage SQLite (metrics.db).
+Log structuré des actions. Stockage SQLite (metrics.db) via core/db.get_metrics_db().
 
 (Migré JSON→SQLite le 20 juin 2026.)
 """
 
 import json
 import logging
-import os
 import sqlite3
 from datetime import datetime, timezone
 
+from core.db import get_metrics_db
+
 logger = logging.getLogger(__name__)
 
-BASE_DIR = os.path.expanduser("~/santana")
-DB_PATH = os.path.join(BASE_DIR, "metrics.db")
 MAX_ENTRIES = 10_000
 TRUNCATE_LENGTH = 200
 
@@ -43,7 +41,7 @@ def log_action(
     }
 
     try:
-        conn = sqlite3.connect(DB_PATH, timeout=5)
+        conn = get_metrics_db()
         conn.execute(
             "INSERT INTO tracabilite (timestamp, type, content, meta) VALUES (?, ?, ?, ?)",
             (ts, action_type, truncated, json.dumps(metadata or {}))
@@ -53,7 +51,6 @@ def log_action(
             (MAX_ENTRIES,)
         )
         conn.commit()
-        conn.close()
     except Exception as e:
         logger.error("[TRACABILITE] SQLite error: %s", e)
 
