@@ -16,9 +16,18 @@ from agent.evaluator import (
 
 @pytest.fixture(autouse=True)
 def _isolate_eval_file(tmp_path, monkeypatch):
-    """Empêche les tests d'écrire dans le vrai eval_history.json."""
+    """Empêche les tests d'écrire dans le vrai metrics.db.
+
+    agent/evaluator.py utilise désormais core.db.get_metrics_db() (connexion
+    partagée, schéma auto-créé) — on isole en repointant core.db.METRICS_DB
+    vers un fichier temporaire et en forçant une nouvelle connexion
+    thread-locale, plutôt que de monkeypatcher un EVAL_DB qui n'existe plus.
+    """
+    import core.db as db
     import agent.evaluator as evaluator
-    monkeypatch.setattr(evaluator, "EVAL_DB", str(tmp_path / "test_eval.db"))
+    monkeypatch.setattr(db, "METRICS_DB", str(tmp_path / "test_eval.db"))
+    monkeypatch.setattr(db, "_local", __import__("threading").local())
+    monkeypatch.setattr(evaluator, "_EVAL_HISTORY", [])
 
 
 class TestEvaluationResult:

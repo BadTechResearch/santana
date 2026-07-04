@@ -373,7 +373,20 @@ async def react_loop(user_message: str,
             _cost_est = estimate_cost_from_messages(messages, mt)
             _gov = check_cost_governor(_cost_est)
             if _gov == "ALERT":
-                logging.info("[COST] ALERT — tracking passif, pas de bridage")
+                logging.info("[COST] ALERT — 80%% du budget atteint, pas de bridage")
+            elif _gov == "THROTTLE":
+                logging.warning("[COST] THROTTLE — 95%% du budget atteint, outils coûteux coupés")
+                if actual_tools:
+                    actual_tools = [t for t in actual_tools
+                                    if t["function"]["name"] not in _EXPENSIVE_TOOLS]
+                max_iter = min(max_iter, iteration + 2)
+            elif _gov == "STOP":
+                logging.error("[COST] STOP — budget épuisé, appel LLM refusé")
+                last_content = (
+                    "Budget de session épuisé pour l'instant. Utilise /reset pour "
+                    "réinitialiser le compteur, ou attends le prochain cycle."
+                )
+                break
 
             if actual_tools:
                 tc = "auto"   # Outils toujours disponibles

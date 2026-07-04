@@ -293,8 +293,14 @@ def tool_fs_write(path: str, content: str) -> str:
 def tool_delegate_task(goal: str, context: str = "") -> str:
     """Délègue une tâche à un sous-agent isolé (exécution parallèle).
 
-    Utilise asyncio.run() pour créer une boucle d'événements dédiée
-    au sous-agent. Le résultat est retourné quand la tâche est terminée.
+    execute_tool()/dispatch() appellent cet outil de façon SYNCHRONE depuis
+    l'intérieur de la boucle asyncio déjà active de react_loop() — un simple
+    asyncio.run() ici lève RuntimeError("asyncio.run() cannot be called from
+    a running event loop") à 100% des appels réels. On lance donc la
+    coroutine dans un thread dédié avec sa propre boucle d'événements, et on
+    bloque jusqu'à son résultat — le thread appelant (celui de react_loop)
+    attend déjà la fin de l'outil de toute façon, delegate_task n'étant ni
+    dans _PARALLEL_TOOLS ni _EXPENSIVE_TOOLS.
 
     Args:
         goal: Objectif précis de la tâche
@@ -303,11 +309,20 @@ def tool_delegate_task(goal: str, context: str = "") -> str:
     Returns:
         Résultat textuel de la sous-tâche
     """
-    try:
-        return asyncio.run(_delegate_task_async(goal=goal, context=context))
-    except Exception as e:
-        logging.error(f"[TOOL] delegate_task error: {e}")
-        return json.dumps({"error": f"Erreur délégation: {str(e)}"})
+    import threading
+    result: dict = {}
+
+    def _run_in_new_loop():
+        try:
+            result["value"] = asyncio.run(_delegate_task_async(goal=goal, context=context))
+        except Exception as e:
+            logging.error(f"[TOOL] delegate_task error: {e}")
+            result["value"] = json.dumps({"error": f"Erreur délégation: {str(e)}"})
+
+    t = threading.Thread(target=_run_in_new_loop, daemon=True)
+    t.start()
+    t.join()
+    return result.get("value", json.dumps({"error": "delegate_task: aucun résultat"}))
 
 
 # ─── REGISTRE ─────────────────────────────────────────────────────────────────

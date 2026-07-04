@@ -17,7 +17,12 @@ import logging
 import threading
 
 BASE_DIR = os.path.expanduser("~/santana")
-MEMORY_DB = os.path.join(BASE_DIR, "memory.db")
+# Nom historique DB_PATH conservé (pas MEMORY_DB) : plusieurs tests
+# (test_context.py, test_memory.py, test_100_memoire.py, test_tools.py)
+# monkeypatchent `core.db.DB_PATH` directement pour isoler leurs écritures
+# dans un fichier temporaire — renommer la variable casse cette isolation
+# silencieusement (get_db() doit relire l'attribut de module à chaque appel).
+DB_PATH = os.path.join(BASE_DIR, "memory.db")
 METRICS_DB = os.path.join(BASE_DIR, "metrics.db")
 
 # Thread-local storage : chaque thread a sa propre connexion
@@ -28,7 +33,7 @@ def get_db() -> sqlite3.Connection:
     """Retourne une connexion à memory.db (thread-local)."""
     if not hasattr(_local, "conn") or _local.conn is None:
         try:
-            _local.conn = sqlite3.connect(MEMORY_DB)
+            _local.conn = sqlite3.connect(DB_PATH)
             _local.conn.execute("PRAGMA journal_mode=WAL")
             _local.conn.execute("PRAGMA busy_timeout=5000")
             _local.conn.row_factory = sqlite3.Row

@@ -19,10 +19,15 @@ logger = logging.getLogger(__name__)
 # ─── 1. Scan des fichiers soul/ ───────────────────────────────────────
 
 def scan_soul() -> dict:
-    """Lit les fichiers de personnalité (SOUL, RULES, STYLE, USER)."""
+    """Lit les fichiers de personnalité effectivement utilisés par le prompt
+    système (liste importée de agent.orchestrator.SOUL_FILES — source unique
+    de vérité, pour ne plus jamais désynchroniser scan_soul() du vrai
+    prompt-builder comme RULES.md/STYLE.md l'étaient devenus après la fusion
+    en CONDUCT.md le 20/06/2026)."""
+    from agent.orchestrator import SOUL_FILES
     soul_dir = os.path.join(BASE_DIR, "soul")
     result = {}
-    for fname in ["SOUL.md", "RULES.md", "STYLE.md", "USER.md"]:
+    for fname in SOUL_FILES:
         fpath = os.path.join(soul_dir, fname)
         if os.path.exists(fpath):
             with open(fpath) as f:

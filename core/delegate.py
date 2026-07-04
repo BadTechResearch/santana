@@ -31,6 +31,19 @@ async def delegate_task(goal: str, context: str = "") -> str:
     logger.info(f"[DELEGATE] Tâche {task_id}: {goal[:80]}...")
     start = time.time()
 
+    import agent.context as _ctx
+
+    # Isolation de session : sans ça, react_loop() du sous-agent écrit dans
+    # le MÊME session_buffer que la conversation principale (agent/context.py
+    # expose SESSION_ID comme un global de module, pas par-appel) — le prompt
+    # synthétique "[TÂCHE DÉLÉGUÉE ...]" polluerait le contexte que Serge voit.
+    # On bascule sur un SESSION_ID temporaire pour la durée de la délégation,
+    # puis on restaure celui du parent — sûr ici car delegate_task n'est pas
+    # dans _PARALLEL_TOOLS (pas d'exécution concurrente avec le thread appelant
+    # pendant que ce swap est actif).
+    _parent_session_id = _ctx.SESSION_ID
+    _ctx.SESSION_ID = f"delegate-{task_id}-{uuid.uuid4()}"
+
     try:
         # Construire un message pour la sous-boucle
         prompt = f"[TÂCHE DÉLÉGUÉE {task_id}]\n"
@@ -53,3 +66,5 @@ async def delegate_task(goal: str, context: str = "") -> str:
         elapsed = time.time() - start
         logger.error(f"[DELEGATE] Tâche {task_id} échouée ({elapsed:.1f}s): {e}")
         return json.dumps({"task_id": task_id, "error": str(e), "duration_s": round(elapsed, 1)})
+    finally:
+        _ctx.SESSION_ID = _parent_session_id

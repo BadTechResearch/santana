@@ -68,7 +68,10 @@ CLAUDE.md
 skills/profile-serge.md
 
 # Scripts opérationnels personnels
-scripts/backup_*.sh
+# (scripts/backup_db.sh EXCLU de ce pattern : c'est le backup SQLite générique
+# utilisé par santana.py au démarrage, pas un script personnel — le pattern
+# large "scripts/backup_*.sh" l'excluait par erreur du dépôt public, cassant
+# le backup automatique et 2 tests qui vérifient sa présence/contenu.)
 scripts/safe_edit.sh
 scripts/santana-crash-snapshot.sh
 scripts/cleanup-console.sh

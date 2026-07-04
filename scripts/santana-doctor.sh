@@ -89,6 +89,20 @@ else:
     print('  ❌ Aucun provider configuré')
 " 2>/dev/null
 
+# 8. Sécurité — permissions .env
+echo "🔒 Sécurité:"
+for f in "$HOME/.env" "$HOME/hermes/.env" "$HOME/.hermes/.env" "$BASE_DIR/.env"; do
+    if [ -f "$f" ]; then
+        perms=$(stat -c "%a" "$f" 2>/dev/null)
+        if [ "$perms" = "600" ]; then
+            echo -e "  ${GREEN}✅${NC} $(basename $(dirname $f))/$(basename $f) = $perms"
+        else
+            echo -e "  ${RED}❌${NC} $(basename $(dirname $f))/$(basename $f) = $perms (devrait être 600)"
+            fail=$((fail+1))
+        fi
+    fi
+done
+
 echo ""
 echo "================================"
 echo "Résultat: ${GREEN}$pass succès${NC}, ${RED}$fail échecs${NC}"

@@ -18,6 +18,13 @@ SOUL_DIR = os.path.join(BASE_DIR, "soul")
 _PROMPT_CACHE = {"base": None, "soul_mtime": 0}
 _SOUL_CACHE = {}
 
+# Liste canonique des fichiers soul/ effectivement utilisés par le prompt
+# système (voir _build_prompt_base ci-dessous). Source unique de vérité :
+# agent/self.py::scan_soul() l'importe au lieu de maintenir sa propre liste
+# (RULES.md/STYLE.md ont été fusionnés en CONDUCT.md le 20/06/2026 — c'est
+# exactement ce genre de divergence qu'une liste partagée rend impossible).
+SOUL_FILES = ["SOUL.md", "IDENTITY.md", "USER.md", "CONDUCT.md"]
+
 
 def _load_soul_file_cached(filename: str) -> str:
     """Charge le contenu d'un fichier soul/ avec cache."""
@@ -117,7 +124,7 @@ def get_prompt_base() -> str:
     """Retourne la base du prompt avec cache. Reconstruit si soul/*.md a changé."""
     global _PROMPT_CACHE
     latest_mtime = 0
-    for fname in ["SOUL.md", "IDENTITY.md", "USER.md", "CONDUCT.md"]:
+    for fname in SOUL_FILES:
         fpath = os.path.join(SOUL_DIR, fname)
         if os.path.exists(fpath):
             try:

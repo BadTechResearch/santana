@@ -14,7 +14,14 @@ class TestScanSoul:
         r = scan_soul()
         assert isinstance(r, dict)
         assert "SOUL.md" in r
-        assert "RULES.md" in r
+
+    def test_meme_fichiers_que_le_prompt_builder(self):
+        """scan_soul() doit scanner exactement les fichiers utilisés par
+        agent.orchestrator._build_prompt_base() — c'est la désynchronisation
+        (RULES.md/STYLE.md vs CONDUCT.md) corrigée le 04/07/2026."""
+        from agent.orchestrator import SOUL_FILES
+        r = scan_soul()
+        assert list(r.keys()) == SOUL_FILES
 
     def test_fichier_existant(self):
         r = scan_soul()
