@@ -95,33 +95,73 @@ def test_module_imports_without_error(module_name):
 
 
 def test_santana_py_referenced_names_exist():
-    """santana.py importe des noms depuis tg_handlers.* — vérifie que chacun
-    existe réellement, SANS importer santana.py lui-même (cf docstring du
-    fichier : effets de bord réels au niveau module — verrou process +
-    alerte Telegram conditionnelle).
+    """Vérifie que tous les noms de handlers passés à CommandHandler/
+    MessageHandler/CallbackQueryHandler dans santana.py sont bien définis
+    quelque part dans le fichier (def/async def inline, ou import) — SANS
+    importer santana.py lui-même (cf docstring du fichier : effets de bord
+    réels au niveau module — verrou process + alerte Telegram conditionnelle).
+
+    Remplace une version antérieure qui ne vérifiait que les imports
+    `from tg_handlers.* import ...` : le 04/07/2026, une tentative de split
+    vers un module tg_handlers (jamais créé, jamais committé) a laissé des
+    imports cassés référençant des noms inexistants — panne immédiate au
+    démarrage (NameError dès le premier add_handler()) restée invisible
+    parce que le service tournait déjà avec l'ancien code en mémoire. Ce
+    test attrape cette classe de bug quelle que soit sa forme (import cassé
+    OU fonction supprimée par erreur), en vérifiant la résolution réelle des
+    noms plutôt qu'un pattern d'import particulier.
     """
     santana_path = os.path.join(BASE_DIR, "santana.py")
     with open(santana_path) as f:
-        tree = ast.parse(f.read(), filename=santana_path)
+        src = f.read()
+    tree = ast.parse(src, filename=santana_path)
 
-    failures = []
-    checked_any = False
+    defined = set()
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("tg_handlers"):
-            checked_any = True
-            try:
-                mod = importlib.import_module(node.module)
-            except ImportError as e:
-                failures.append(f"{node.module} : module introuvable ({e})")
-                continue
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            defined.add(node.name)
+        elif isinstance(node, ast.Import):
             for alias in node.names:
-                if not hasattr(mod, alias.name):
-                    failures.append(
-                        f"{node.module}.{alias.name} n'existe pas mais est importé par santana.py "
-                        f"(ligne {node.lineno})"
-                    )
-    assert checked_any, "Aucun import tg_handlers.* trouvé dans santana.py — le test ne vérifie peut-être plus rien"
-    assert not failures, "santana.py importe des noms qui n'existent pas :\n" + "\n".join(failures)
+                defined.add((alias.asname or alias.name).split(".")[0])
+        elif isinstance(node, ast.ImportFrom):
+            for alias in node.names:
+                defined.add(alias.asname or alias.name)
+
+    # Noms de handlers référencés par CommandHandler(...)/MessageHandler(...)/
+    # CallbackQueryHandler(...), et par la liste [(cmd, handler), ...] de la
+    # boucle d'enregistrement des CommandHandler.
+    # Variables cibles de `for x, y in [...]` — à exclure des noms référencés
+    # (ce sont des variables de boucle, pas des noms globaux à résoudre).
+    loop_targets = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.For) and isinstance(node.target, ast.Tuple):
+            for elt in node.target.elts:
+                if isinstance(elt, ast.Name):
+                    loop_targets.add(elt.id)
+
+    referenced = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            if node.func.id in ("CommandHandler", "MessageHandler", "CallbackQueryHandler"):
+                for arg in node.args:
+                    if isinstance(arg, ast.Name) and arg.id not in loop_targets:
+                        referenced.add(arg.id)
+        # Tuples littéraux (cmd, handler) DANS une liste littérale — c'est ici
+        # que les vrais noms de handlers apparaissent pour la boucle
+        # `for cmd, handler in [(...), ...]`.
+        if isinstance(node, ast.List):
+            for elt in node.elts:
+                if isinstance(elt, ast.Tuple) and len(elt.elts) == 2:
+                    second = elt.elts[1]
+                    if isinstance(second, ast.Name):
+                        referenced.add(second.id)
+
+    missing = sorted(n for n in referenced if n not in defined)
+    assert not missing, (
+        f"santana.py référence des handlers non définis (import cassé ou "
+        f"fonction supprimée par erreur) : {missing}"
+    )
+    assert referenced, "Aucun handler référencé trouvé — le test ne vérifie peut-être plus rien"
 
 
 def test_santana_py_module_level_lock_and_crash_alert_are_guarded():

@@ -63,7 +63,111 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Cal
 _ATLAS_LEARN = None
 _ATLAS_ENABLED = True
 
-# Handlers extraits — supprimés (tg_handlers module inexistant)
+# ── Handlers Telegram (inline) ───────────────────────────────────────
+# Reconstruits le 04/07/2026 : une tentative de split vers un module
+# `tg_handlers` (jamais créé, ni jamais committé — voir
+# ~/.claude/projects/.../santana_known_bugs.md) avait laissé des imports
+# cassés ici, faisant planter santana.py au démarrage (NameError sur
+# start_command/handle_message/etc. dès le premier add_handler()). Ces
+# fonctions restent inline tant qu'un vrai module tg_handlers n'existe pas.
+from telegram import Update
+from core.react_loop import react_loop
+from tools.cost_governor import get_status as _cost_status, reset as _cost_reset
+from agent.context import reset_session as _reset_context_session
+from tools.telegram_stream import TelegramStream
+
+
+async def start_command(update: Update, context):
+    await update.message.reply_text(
+        "🦞 *Santana* — Agent personnel de Serge\n\n"
+        "Je suis ton assistant IA. Envoie-moi un message, je réponds.\n\n"
+        "Commandes disponibles :\n"
+        "/start — Démarrer / menu\n"
+        "/reset — Nettoyer la session\n"
+        "/status — Statut système\n"
+        "/help — Aide"
+    )
+
+
+async def status_command(update: Update, context):
+    await update.message.reply_text("📊 Statut Santana : ✅ opérationnel")
+
+
+async def help_command(update: Update, context):
+    await update.message.reply_text(
+        "🤝 *Aide Santana*\n\n"
+        "Envoie-moi un message texte, je te réponds avec ma boucle ReAct.\n"
+        "Je peux chercher sur le web, exécuter du code, consulter ma mémoire.\n\n"
+        "Commandes :\n"
+        "/start — Démarrer\n"
+        "/reset — Nettoyer la session (reset budget + buffer)\n"
+        "/status — Voir le statut\n"
+        "/help — Cette aide"
+    )
+
+
+async def reset_command(update: Update, context):
+    """Réinitialise le compteur de coût ET le buffer de session."""
+    try:
+        avant = _cost_status()
+        _cost_reset()
+        _reset_context_session()
+        apres = _cost_status()
+        await update.message.reply_text(
+            f"🧹 *Session nettoyée* ✅\n\n"
+            f"Budget : `${apres['budget']:.4f}`\n"
+            f"Utilisé : `${apres['cout_cumule']:.4f}`\n"
+            f"Niveau : `{apres['niveau']}`\n"
+            f"Appels LLM : `{apres['appels']}`\n\n"
+            f"Tu peux maintenant reparler, le compteur est reparti à zéro."
+        )
+    except Exception as e:
+        logging.error(f"[RESET] Erreur: {e}")
+        await update.message.reply_text(f"❌ Erreur reset : {str(e)[:200]}")
+
+
+async def handle_message(update: Update, context):
+    user_msg = update.message.text
+    chat_id = update.effective_chat.id
+    if chat_id != CHAT_ID:
+        await update.message.reply_text("❌ Non autorisé")
+        return
+    try:
+        stream = TelegramStream(context.bot, chat_id)
+        response = await react_loop(user_msg, stream_callback=stream.callback)
+        await stream.finalize(response)
+    except Exception as e:
+        logging.error(f"[HANDLER] handle_message error: {e}")
+        try:
+            await update.message.reply_text(f"❌ Erreur: {str(e)[:200]}")
+        except Exception:
+            pass
+
+
+async def handle_voice(update: Update, context):
+    await update.message.reply_text("🎤 Fichier audio non supporté pour le moment")
+
+
+async def handle_photo(update: Update, context):
+    await update.message.reply_text("🖼️ Photo non supportée pour le moment")
+
+
+async def handle_video(update: Update, context):
+    await update.message.reply_text("🎬 Vidéo non supportée pour le moment")
+
+
+async def handle_document(update: Update, context):
+    await update.message.reply_text("📄 Document non supporté pour le moment")
+
+
+async def handle_webapp_data(update: Update, context):
+    logging.info("[WEBAPP] Données webapp reçues (non traitées)")
+
+
+async def handle_callback_query(update: Update, context):
+    await update.callback_query.answer("Fonction non disponible")
+
+
 os.makedirs(BASE_DIR, exist_ok=True)
 os.makedirs(SOUL_DIR, exist_ok=True)
 
@@ -186,12 +290,13 @@ if __name__ == '__main__':
         import asyncio as _asyncio
         await _asyncio.sleep(2)
         # Menu de commandes Telegram (≡ hamburger)
+        # NOTE : brainstorm/brainstorm_stop/atlas/memo retirés du menu le
+        # 04/07/2026 — référencés dans une tentative de split vers un module
+        # tg_handlers jamais créé ; aucune implémentation n'existe pour ces
+        # commandes. À ajouter au menu quand (et si) elles seront codées.
         await app.bot.set_my_commands([
             ('start', '🔄 Démarrer la session'),
-            ('brainstorm', '🧠 Mode brainstorm'),
-            ('brainstorm_stop', '🛑 Stop brainstorm'),
             ('status', '📊 Statut système'),
-            ('atlas', '🗄️ Atlas mémoire'),
             ('reset', '🗑️ Réinitialiser la session'),
             ('help', '🤝 Aide'),
         ])
@@ -208,10 +313,8 @@ if __name__ == '__main__':
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(_post_init).post_stop(_post_stop).build()
     for cmd, handler in [
         ('start', start_command), ('status', status_command), ('statut', status_command),
-        ('atlas', atlas_command),
-        ('memo', memo_command), ('reset', reset_command),
+        ('reset', reset_command),
         ('help', help_command),
-        ('brainstorm', brainstorm_command), ('brainstorm_stop', brainstorm_stop_command),
     ]:
         app.add_handler(CommandHandler(cmd, handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
