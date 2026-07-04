@@ -4,7 +4,7 @@
 
 **Santana** is a production-ready autonomous AI agent built on the **Hermes Agent** framework. It maintains persistent memory, searches the web and social platforms, manages GitHub repositories, executes sandboxed code, interacts across Telegram/Discord/API, and continuously monitors its own costs.
 
-Built entirely in Python by **Serge** (BadTechResearch).
+Built entirely in Python by **Serge**.
 
 ---
 
