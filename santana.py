@@ -63,16 +63,7 @@ from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, Cal
 _ATLAS_LEARN = None
 _ATLAS_ENABLED = True
 
-# Handlers extraits — import direct depuis les modules splittés
-# [Public] tg_handlers supprimé.commands import (
-    start_command, status_command, atlas_command, help_command,
-    memo_command, reset_command,
-)
-# [Public] tg_handlers supprimé.brainstorm import brainstorm_command, brainstorm_stop_command
-# [Public] tg_handlers supprimé.messages import handle_message, handle_voice
-# [Public] tg_handlers supprimé.media import handle_photo, handle_video, handle_document, handle_webapp_data
-# [Public] tg_handlers supprimé.buttons import handle_callback_query
-
+# Handlers extraits — supprimés (tg_handlers module inexistant)
 os.makedirs(BASE_DIR, exist_ok=True)
 os.makedirs(SOUL_DIR, exist_ok=True)
 
