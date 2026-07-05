@@ -136,7 +136,7 @@ santana/
 │   ├── cost_governor.py    # Budget-aware cost governor
 │   ├── delegate.py         # Task delegation to subagents
 │   └── utils.py            # Helpers (env, logging, formatting)
-├── tools/                  # Tool implementations (15+ tools)
+├── tools/                  # Tool implementations (36 tools)
 │   ├── tools.py            # Tool registry & dispatch
 │   ├── code_exec.py        # Sandboxed code execution
 │   ├── web_search.py       # Web search (Serper API)
