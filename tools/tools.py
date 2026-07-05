@@ -33,6 +33,9 @@ TOOLS = json.load(open(os.path.join(BASE_DIR, "tools", "tools.json"), "r"))
 from tools.web_search import tool_web_search
 from tools.memory_ops import tool_memory_query, tool_atlas
 from tools.social_search import social_search as tool_social_search_raw
+from tools.social_search import tool_social_news, tool_social_browser, tool_twitter_search, tool_reddit_search
+from tools.social_search import tool_instagram_search, tool_tiktok_search
+from tools.social_search import tool_twitter_lookup, tool_reddit_lookup, tool_instagram_lookup, tool_tiktok_lookup
 from tools.code_exec import run_code as tool_run_code_raw
 from tools.vm_security import validate_command, validate_script, safe_env
 from tools.youtube import tool_youtube_info
@@ -350,6 +353,16 @@ _reg_register("web_navigate", tool_web_navigate, arg_map={"url": "url"})
 _reg_register("web_screenshot", tool_web_screenshot, arg_map={"url": "url"})
 _reg_register("atlas", tool_atlas, arg_map={"context": "context"})
 _reg_register("social_search", tool_social_search, arg_map={"query": "query", "platform": "platform", "count": "count"}, defaults={"count": "5"})
+_reg_register("social_news", tool_social_news, arg_map={"query": "query", "platform": "platform", "max_results": "max_results"}, defaults={"platform": "all", "max_results": "8"})
+_reg_register("social_browser", tool_social_browser, arg_map={"url": "url", "timeout": "timeout"}, defaults={"timeout": "20"})
+_reg_register("twitter_search", tool_twitter_search, arg_map={"query_search": "query_search", "max_tweets": "max_tweets"}, defaults={"max_tweets": "10"})
+_reg_register("reddit_search", tool_reddit_search, arg_map={"query": "query", "subreddit": "subreddit", "max_posts": "max_posts"}, defaults={"max_posts": "10"})
+_reg_register("instagram_search", tool_instagram_search, arg_map={"query": "query", "max_posts": "max_posts"}, defaults={"max_posts": "10"})
+_reg_register("tiktok_search", tool_tiktok_search, arg_map={"query": "query", "max_posts": "max_posts"}, defaults={"max_posts": "10"})
+_reg_register("twitter_lookup", tool_twitter_lookup, arg_map={"handle": "handle", "query": "query", "max_tweets": "max_tweets"}, defaults={"query": "", "max_tweets": "5"})
+_reg_register("reddit_lookup", tool_reddit_lookup, arg_map={"subreddit": "subreddit", "max_posts": "max_posts"}, defaults={"max_posts": "5"})
+_reg_register("instagram_lookup", tool_instagram_lookup, arg_map={"username": "username", "max_posts": "max_posts"}, defaults={"max_posts": "5"})
+_reg_register("tiktok_lookup", tool_tiktok_lookup, arg_map={"username": "username", "max_posts": "max_posts"}, defaults={"max_posts": "5"})
 _reg_register("self_inspect", tool_self_inspect, arg_map={})
 _reg_register("fs_read", tool_fs_read,
               arg_map={"path": "path", "offset": "offset", "limit": "limit"},
@@ -381,6 +394,9 @@ for reg_tool in _reg_get_tools():
     if reg_tool["function"]["name"] not in _BASE_TOOL_NAMES:
         TOOLS.append(reg_tool)
 logging.info(f"[TOOLS] {len(TOOLS)} outils (base: {len(_BASE_TOOL_NAMES)}, registry: {len(_reg_get_tools())})")
+
+# Chargement EAGER des outils MCP (pas lazy) — pour que le LLM les voie dans TOOLS
+_ensure_mcp_loaded()
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

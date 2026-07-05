@@ -1,4 +1,4 @@
-"""Définition formelle du 100% — rubrique OPTIMISATION/FRUGALITÉ BTR.
+"""Définition formelle du 100% — rubrique OPTIMISATION/FRUGALITÉ Black Intelligence.
 
 Plan de fermeture (/tmp/plan-fermeture-100.md).
 """
@@ -107,7 +107,7 @@ def test_deepseek_only():
 
 
 def test_no_docker_artifacts():
-    """Aucun artefact Docker actif — la philosophie BTR exclut Docker, et le daemon est HS sur la VM."""
+    """Aucun artefact Docker actif — la philosophie Black Intelligence exclut Docker, et le daemon est HS sur la VM."""
     suspects = []
     for entry in ("docker", "docker-compose.yml", "docker-compose.yaml", "requirements-docker.txt", ".dockerignore"):
         p = os.path.join(BASE_DIR, entry)

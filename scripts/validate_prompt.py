@@ -90,7 +90,7 @@ rules_check = [
     ("### 3.", "Règle 3 — Sources"),
     ("Bonjour", "Salutation"),
     ("je ne sais pas", "Honnêteté intellectuelle"),
-    ("agent BTR", "Vocabulaire BTR"),
+    ("agent Black Intelligence", "Vocabulaire Black Intelligence"),
     ("Atlas", "Mémoire Atlas"),
     ("DeepSeek", "Provider LLM"),
 ]

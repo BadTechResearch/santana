@@ -1,63 +1,61 @@
-"""Outil de recherche web via Serper.dev (fallback DuckDuckGo si épuisé)."""
+"""Outils de recherche web — Serper.dev (si clé dispo) + ddgs (API DuckDuckGo officielle, gratuit)."""
 
 import os
 import logging
 import requests
 
-from metrics import track
+from ddgs import DDGS
 
 
-@track()
-def _serper_search(query: str) -> str:
-    """Recherche via Serper.dev API (nécessite crédits)."""
+def _serper_search(query: str) -> str | None:
+    """Recherche via Serper.dev API (nécessite crédits/key)."""
     key = os.getenv("SERPER_KEY", "")
-    r = requests.post(
-        "https://google.serper.dev/search",
-        headers={"X-API-KEY": key, "Content-Type": "application/json"},
-        json={"q": query, "gl": "be", "hl": "fr"},
-        timeout=10,
-    )
-    if r.status_code != 200:
-        return None  # Fallback silencieux
-    results = r.json().get("organic", [])[:6]
-    if not results:
+    if not key:
+        return None  # Pas de clé = skip silencieux
+    try:
+        r = requests.post(
+            "https://google.serper.dev/search",
+            headers={"X-API-KEY": key, "Content-Type": "application/json"},
+            json={"q": query, "gl": "be", "hl": "fr"},
+            timeout=10,
+        )
+        if r.status_code != 200:
+            return None
+        results = r.json().get("organic", [])[:6]
+        if not results:
+            return None
+        return "\n".join(
+            f"- {x.get('title', '')}: {x.get('snippet', '')}" for x in results
+        )
+    except Exception as e:
+        logging.warning(f"[WEB_SEARCH] Serper error: {e}")
         return None
-    return "\n".join(
-        f"- {x.get('title', '')}: {x.get('snippet', '')}" for x in results
-    )
 
 
-@track()
-def _ddg_search(query: str) -> str:
-    """Recherche via DuckDuckGo HTML (gratuit, sans clé)."""
-    r = requests.post(
-        "https://html.duckduckgo.com/html/",
-        data={"q": query},
-        headers={
-            "User-Agent": "Mozilla/5.0 (compatible; SantanaBTR/1.0)"
-        },
-        timeout=15,
-    )
-    if r.status_code != 200:
+def _ddg_search_api(query: str, max_results: int = 6) -> str | None:
+    """Recherche via l'API officielle DuckDuckGo (gratuit, sans clé).
+
+    Utilise duckduckgo_search (lib maintenue, pas de scraping HTML).
+    """
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, region="fr-fr", safesearch="off", max_results=max_results))
+        if not results:
+            return None
+        lines = []
+        for r in results:
+            title = r.get("title", "").strip()
+            snippet = r.get("body", "").strip()
+            if title:
+                lines.append(f"- {title}: {snippet[:200]}" if snippet else f"- {title}")
+        return "\n".join(lines) if lines else None
+    except Exception as e:
+        logging.warning(f"[WEB_SEARCH] DDGS API error: {e}")
         return None
-    # Extraction simple : chaque résultat est dans un bloc <a class="result__a">
-    results = []
-    for line in r.text.split("\n"):
-        if 'class="result__a"' in line:
-            # Extraire titre
-            import re
-            title = re.sub(r'<[^>]+>', '', line).strip()
-            if title and title not in results:
-                results.append(title[:120])
-        if len(results) >= 6:
-            break
-    if not results:
-        return None
-    return "\n".join(f"- {r}" for r in results)
 
 
 def tool_web_search(query: str) -> str:
-    """Effectue une recherche web (Serper.dev, fallback DuckDuckGo)."""
+    """Effectue une recherche web (Serper.dev si clé dispo, fallback DuckDuckGo API)."""
     try:
         # F8 — Audit souveraineté temps réel
         try:
@@ -71,9 +69,9 @@ def tool_web_search(query: str) -> str:
         if result:
             return result
 
-        # Fallback DuckDuckGo
-        logging.info("[WEB_SEARCH] Serper epuise, fallback DuckDuckGo")
-        result = _ddg_search(query)
+        # Fallback DuckDuckGo (API officielle)
+        logging.info("[WEB_SEARCH] Serper indisponible, fallback DuckDuckGo API")
+        result = _ddg_search_api(query)
         if result:
             return result
 

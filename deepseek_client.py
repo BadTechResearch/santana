@@ -82,7 +82,10 @@ def _ds_complete(messages, model, max_tokens, tools, tool_choice, timeout):
                 _body = r.text[:500]
                 logging.error("[DEEPSEEK] %d — body: %s", r.status_code, _body)
             r.raise_for_status()
-            return r.json()['choices'][0]
+            resp = r.json()
+            choice = resp['choices'][0]
+            choice['usage'] = resp.get('usage', {})
+            return choice
         except RuntimeError:
             raise
         except (requests.exceptions.Timeout,
@@ -185,10 +188,12 @@ def _ds_complete_stream(messages, model, max_tokens, tools, tool_choice, timeout
                             tool_calls[idx]['function']['name'] += tc['function']['name']
                         if tc.get('function', {}).get('arguments'):
                             tool_calls[idx]['function']['arguments'] += tc['function']['arguments']
+                usage = chunk.get('usage', {})
                 if finish:
                     result = {
                         'type': 'complete', 'content': content,
-                        'finish_reason': finish
+                        'finish_reason': finish,
+                        'usage': usage
                     }
                     if reasoning:
                         result['reasoning_content'] = reasoning

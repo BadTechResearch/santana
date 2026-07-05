@@ -86,3 +86,7 @@ docs/latency_benchmark.json
 
 # Captures d'écran générées (Playwright)
 screenshots/
+
+# Artefacts de test
+.coverage
+.session_id

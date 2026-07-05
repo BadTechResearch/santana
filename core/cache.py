@@ -53,6 +53,18 @@ def cache_set(name: str, args: dict, result: str):
         logger.debug(f"[CACHE] Write error: {e}")
 
 
+def cache_purge_all():
+    """Vide complètement le cache disque."""
+    import shutil
+    try:
+        if os.path.isdir(_CACHE_DIR):
+            shutil.rmtree(_CACHE_DIR)
+            os.makedirs(_CACHE_DIR, exist_ok=True)
+        logger.info(f"[CACHE] Purge totale: {_CACHE_DIR}")
+    except Exception as e:
+        logger.error(f"[CACHE] Purge error: {e}")
+
+
 def estimate_tokens(text: str) -> int:
     """Estimation plus précise que len//4 pour le français.
     

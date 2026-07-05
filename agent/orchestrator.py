@@ -251,13 +251,17 @@ def get_routing_intent(msg_type: str, text: str = "") -> str:
     return intent_map.get(msg_type, intent_map["PERSONNEL"])
 
 
-def build_system_prompt(user_message: str = "") -> str:
+def build_system_prompt(user_message: str = "", msg_type: str = None) -> str:
     """Construit le prompt système complet : socle caché + couche dynamique.
 
     Le socle (identité + âme + règles + instructions finales) est mis en cache
     et reconstruit uniquement si les fichiers soul/*.md changent.
     La couche dynamique (contexte session, skills, mémoire vivante) est
     reconstruite à chaque message.
+
+    Args:
+        user_message: Message utilisateur pour injection contexte
+        msg_type: Type de message pré-classifié (évite 2e appel classify)
     """
     # Socle mis en cache
     prompt = get_prompt_base()
@@ -271,8 +275,10 @@ def build_system_prompt(user_message: str = "") -> str:
         logging.error("[SYSTEM] Self-context fallback: %s", e)
         prompt += "\nOutils: web_search, memory_query, get_datetime, save_skill, search_skills, web_navigate, web_screenshot, atlas.\n"
 
-    # Routing intent (dépend du message)
-    prompt += "\n" + get_routing_intent(classify_message(user_message), user_message) + "\n"
+    # Routing intent — utiliser msg_type passé ou classifier si None
+    if msg_type is None:
+        msg_type = classify_message(user_message)
+    prompt += "\n" + get_routing_intent(msg_type, user_message) + "\n"
 
     # Profil utilisateur injecté (Phase 1 — P1)
     try:
@@ -319,8 +325,8 @@ def build_system_prompt(user_message: str = "") -> str:
     except Exception as e:
         logging.error("[SKILLS] Skills fetch failure: %s", e)
 
-    # Contexte de session
-    message_type = classify_message(user_message) if user_message else "SOCIAL"
+    # Contexte de session (utilise msg_type passé — évite 3e classify)
+    message_type = msg_type if msg_type else (classify_message(user_message) if user_message else "SOCIAL")
     _degraded = os.path.exists(os.path.join(BASE_DIR, '.crash_flag'))
 
     # Planification pour tâches complexes (Plan-and-Execute)
@@ -374,8 +380,8 @@ def build_system_prompt(user_message: str = "") -> str:
         except Exception as e:
             logging.error("[MEMORY] Conflict detector fallback: %s", e)
 
-    # Suggestion proactive (Phase 2 — Réveil)
-    if not _degraded and user_message:
+    # Suggestion proactive (Phase 2 — Réveil) — skip pour SOCIAL
+    if message_type not in ("SOCIAL",) and not _degraded and user_message:
         try:
             from agent.proactive import can_suggest, build_suggestion
             ok, reason = can_suggest()

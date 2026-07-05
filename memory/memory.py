@@ -113,6 +113,18 @@ def count_skills() -> int:
         return 0
 
 
+def clear_short_term():
+    """Vide la mémoire conversationnelle (table memory)."""
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("DELETE FROM memory")
+        conn.commit()
+        logging.info("[MEMORY] Table memory vidée par /reset")
+    except Exception as e:
+        logging.error(f"[MEMORY] clear_short_term error: {e}")
+
+
 def get_top_skills(limit=5) -> list:
     """Retourne les N skills les plus utilisées."""
     try:

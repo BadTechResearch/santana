@@ -10,14 +10,16 @@ from datetime import datetime
 
 from deepseek_client import complete, complete_stream
 from tools.tools import execute_tool, TOOLS
-from tools.cost_governor import check_cost_governor, estimate_cost_from_messages
+from tools.cost_governor import check_cost_governor, estimate_cost_from_messages, record_usage
 from memory.memory import get_recent_memory
 from core.utils import strip_dsml
 from agent.orchestrator import build_system_prompt, classify_message
 from agent.context import push_exchange, maybe_auto_summarize, init_session as init_context_session
 from core.disambiguate import disambiguate
 from core.json_logger import json_log
-from core.cache import cache_get, cache_set
+from core.cache import cache_get, cache_set, cache_purge_all
+import threading
+from agent.evaluator import evaluate_response, log_evaluation
 
 # ─── Garde-fou : validation des appels outils avant exécution ──────────
 _ALLOWED_TOOL_NAMES = frozenset(t["function"]["name"] for t in TOOLS)
@@ -41,6 +43,17 @@ _SESSION_TIMEOUT = 300    # Temps max total pour une session complète (5 min)
 # Quarantaine d'outils : après 3 échecs consécutifs, l'outil est gelé 1h
 _QUARANTINE_SECONDS = 3600  # 1 heure
 _quarantined_until: dict[str, float] = {}  # tool_name -> expiry timestamp
+
+
+def reset_state():
+    """Réinitialise l'état global de react_loop (quarantaine + cache prompt)."""
+    _quarantined_until.clear()
+    _CACHED_PROMPT["system"] = ""
+    _CACHED_PROMPT["msg_type"] = ""
+    _CACHED_PROMPT["time"] = 0.0
+    cache_purge_all()
+
+
 # Outils pouvant prendre du temps (heartbeat assistant)
 _EXPENSIVE_TOOLS = {
     "web_search", "web_navigate", "web_screenshot", "social_search",
@@ -103,6 +116,32 @@ def _validate_tool_result(name: str, result: str) -> str:
         return result[:_MAX_TOOL_RESULT_CHARS] + "\n\n[... résultat tronqué — trop long]"
 
     return result
+
+
+def _schedule_background_eval(response_text: str, user_msg: str):
+    """Lance l'auto-évaluation en tâche de fond (fire-and-forget)."""
+    if not response_text or not user_msg:
+        return
+    try:
+        t = threading.Thread(
+            target=lambda: _run_eval(response_text, user_msg),
+            daemon=True
+        )
+        t.start()
+    except Exception as _ee:
+        logging.error(f"[EVAL-BG] Schedule error: {_ee}")
+
+
+def _run_eval(resp: str, msg: str):
+    """Exécute l'évaluation et logue le score."""
+    try:
+        er = evaluate_response(resp, msg)
+        log_evaluation(er)
+        logging.info(f"[EVAL-BG] Score: {er.score:.2f}")
+        if er.score < 0.5:
+            logging.warning(f"[EVAL-BG] Score critique ({er.score:.2f}) — correction nécessaire")
+    except Exception as _ee:
+        logging.error(f"[EVAL-BG] Error: {_ee}")
 
 
 # ─── Filtrage des outils par type de message (optimisation performance) ──
@@ -174,17 +213,7 @@ def _get_tool_progress(tname: str, targs: dict) -> str:
 
 def _run_tool_with_heartbeat(tname: str, targs: dict,
                               stream_callback) -> str:
-    """Execute un outil avec heartbeat de progression pendant l'attente.
-
-    Probleme : execute_tool() peut prendre 5-15s (web_search, vm_exec...)
-    pendant lesquelles le streaming est en pause. L'utilisateur voit le
-    message fige et le typing indicator Telegram timeout.
-
-    Solution : l'outil tourne dans un thread dedie. Pendant son execution,
-    un heartbeat __PROGRESS__ est emis toutes les 2s -> le message streame
-    continue d'etre edite -> pas de figement.
-    """
-    import threading
+    """Execute un outil avec heartbeat de progression pendant l'attente."""
     result = {"val": "", "done": False}
 
     def _run():
@@ -197,13 +226,15 @@ def _run_tool_with_heartbeat(tname: str, targs: dict,
     t = threading.Thread(target=_run, daemon=True)
     t.start()
 
+    start_ts = time.time()
     dot_count = 0
     while not result["done"]:
         time.sleep(2.0)
         if stream_callback:
             dot_count = (dot_count % 3) + 1  # 1→2→3→1...
             dots = "•" * dot_count
-            stream_callback(f"__PROGRESS__⏳ {tname} en cours{dots}\n\n")
+            elapsed = int(time.time() - start_ts)
+            stream_callback(f"__PROGRESS__⏳ {tname} en cours{dots} ({elapsed}s)\n\n")
 
     t.join(timeout=1)
     return result["val"]
@@ -240,6 +271,7 @@ async def _stream_and_collect(messages, model, max_tokens, tools, tool_choice,
         tool_calls = None
         finish_reason = "stop"
         stream_active = True
+        chunk_usage = {}
         for chunk in complete_stream(messages, model=model,
                                       max_tokens=max_tokens,
                                       tools=tools, tool_choice=tool_choice,
@@ -267,6 +299,7 @@ async def _stream_and_collect(messages, model, max_tokens, tools, tool_choice,
                 finish_reason = chunk.get('finish_reason', 'stop')
                 tool_calls = chunk.get('tool_calls')
                 reasoning = chunk.get('reasoning_content', reasoning)
+                chunk_usage = chunk.get('usage', {})
             elif chunk['type'] == 'error':
                 raise RuntimeError(f"Stream error: {chunk['content']}")
         content_clean = strip_dsml(content) if content else ""
@@ -275,7 +308,8 @@ async def _stream_and_collect(messages, model, max_tokens, tools, tool_choice,
             msg["reasoning_content"] = reasoning
         return {
             "message": msg,
-            "finish_reason": finish_reason
+            "finish_reason": finish_reason,
+            "usage": chunk_usage if isinstance(chunk_usage, dict) else {}
         }
     return await asyncio.to_thread(_run)
 
@@ -312,22 +346,38 @@ async def react_loop(user_message: str,
     # ── Cache prompt système : ne pas reconstruire 26K à chaque message ──
     now = time.time()
     if (msg_type == _CACHED_PROMPT["msg_type"]
-            and now - _CACHED_PROMPT["time"] < 60.0
+            and now - _CACHED_PROMPT["time"] < 300.0
             and _CACHED_PROMPT["system"]):
         SYSTEM = _CACHED_PROMPT["system"]
         logging.info(f"[CACHE] Prompt système réutilisé ({len(SYSTEM)} chars)")
     else:
-        SYSTEM = build_system_prompt(user_message=user_message)
+        SYSTEM = build_system_prompt(user_message=user_message, msg_type=msg_type)
         _CACHED_PROMPT["system"] = SYSTEM
         _CACHED_PROMPT["msg_type"] = msg_type
         _CACHED_PROMPT["time"] = now
     messages = [{"role": "system", "content": SYSTEM}]
 
-    # Contexte récent : 20 messages pour un suivi fluide
-    recent = get_recent_memory(20)
-    if recent:
-        ctx = "\n".join(f"{m['role']}: {m['content'][:500]}" for m in recent)
-        messages.append({"role": "system", "content": "Contexte récent:\n" + ctx})
+    # Contexte récent : uniquement si build_system_prompt() n'a pas déjà
+    # injecté le buffer de session (Couche Bleue). Avant, les deux
+    # coexistaient systématiquement et dupliquaient ~1500-2500 tokens de
+    # contexte quasi identique, répétés à CHAQUE aller-retour LLM du tour
+    # (3-5x). orchestrator.py::build_system_prompt() injecte déjà
+    # session_buffer/session_summary pour msg_type hors SOCIAL/FACTUEL et
+    # hors mode dégradé — get_recent_memory ne sert alors plus que de
+    # fallback pour les autres cas (ou si le buffer est encore vide).
+    _degraded = os.path.exists(os.path.join(BASE_DIR, '.crash_flag'))
+    _session_covered = msg_type not in ("SOCIAL", "FACTUEL") and not _degraded
+    if _session_covered:
+        try:
+            from agent.context import get_session_buffer
+            _session_covered = bool(get_session_buffer())
+        except Exception:
+            _session_covered = False
+    if not _session_covered:
+        recent = get_recent_memory(20)
+        if recent:
+            ctx = "\n".join(f"{m['role']}: {m['content'][:500]}" for m in recent)
+            messages.append({"role": "system", "content": "Contexte récent:\n" + ctx})
 
     # Déterminer la longueur pour le routage
     text_len = len(user_message.strip())
@@ -440,6 +490,19 @@ async def react_loop(user_message: str,
             content = (msg.get("content") or "").strip()
             tool_calls = msg.get("tool_calls")
 
+            # Enregistrer les tokens RÉELS retournés par l'API
+            _usage = choice.get('usage', {})
+            if _usage.get('prompt_tokens'):
+                try:
+                    record_usage(
+                        prompt_tokens=_usage.get('prompt_tokens', 0),
+                        completion_tokens=_usage.get('completion_tokens', 0),
+                        cached_tokens=_usage.get('prompt_cache_hit_tokens', 0),
+                        provider_name='deepseek'
+                    )
+                except Exception as _ue:
+                    logging.error(f"[COST] record_usage error: {_ue}")
+
             if content:
                 last_content = content
 
@@ -449,8 +512,7 @@ async def react_loop(user_message: str,
                 if content and ("<tool_calls>" in content or "<invoke name=" in content):
                     # DeepSeek a leaké des tool_calls en XML — on les PARSE et exécute
                     logging.warning("[DSML] Tool call leak détecté en XML, parsing et exécution directe")
-                    import re as _re
-                    xml_tools = _re.findall(r'<invoke name="([^"]+)"(.*?)</invoke>', content, _re.DOTALL)
+                    xml_tools = re.findall(r'<invoke name="([^"]+)"(.*?)</invoke>', content, re.DOTALL)
                     executed_any = False
                     for tname, tbody in xml_tools:
                         tname = tname.strip()
@@ -494,61 +556,24 @@ async def react_loop(user_message: str,
                 # ── Livrer le contenu (stop ou length, les deux sont traités pareil) ──
 
                 # ── AUTO-ÉVALUATION (diagnostic seulement, pas de correction, tâche de fond) ──
-                # Lancée en thread pour ne pas bloquer la livraison de la réponse
                 if not is_self_query:
-                    try:
-                        import threading as _eval_thr
-                        def _background_eval(resp, msg):
-                            try:
-                                from agent.evaluator import evaluate_response, log_evaluation
-                                er = evaluate_response(resp, msg)
-                                log_evaluation(er)
-                                logging.info(f"[EVAL-BG] Score: {er.score:.2f}")
-                                if er.score < 0.5:
-                                    logging.warning(f"[EVAL-BG] Score critique ({er.score:.2f}) — correction nécessaire")
-                                    # TODO: régénération automatique de la réponse
-                            except Exception as _ee:
-                                logging.error(f"[EVAL-BG] Error: {_ee}")
-                        _eval_thr.Thread(target=_background_eval,
-                                         args=(cleaned, user_message),
-                                         daemon=True).start()
-                    except Exception as _ee:
-                        logging.error(f"[EVAL-BG] Schedule error: {_ee}")
+                    _schedule_background_eval(cleaned, user_message)
                 return _finalize(cleaned if cleaned else "Pas de réponse.", user_message, msg_type=msg_type, tools_used=_tools_called)
 
             # Pas de tools même si finish_reason inattendu
             if not tool_calls:
                 cleaned = strip_dsml(content) if content else ""
-                # AUTO-ÉVALUATION : idem — tâche de fond
                 if not is_self_query:
-                    try:
-                        import threading as _eval2_thr
-                        def _background_eval2(resp, msg):
-                            try:
-                                from agent.evaluator import evaluate_response, log_evaluation
-                                er = evaluate_response(resp, msg)
-                                log_evaluation(er)
-                                logging.info(f"[EVAL-BG] Score: {er.score:.2f}")
-                                if er.score < 0.5:
-                                    logging.warning(f"[EVAL-BG] Score critique ({er.score:.2f}) — correction nécessaire")
-                                    # TODO: régénération automatique de la réponse
-                            except Exception as _ee:
-                                logging.error(f"[EVAL-BG] Error: {_ee}")
-                        _eval2_thr.Thread(target=_background_eval2,
-                                         args=(cleaned, user_message),
-                                         daemon=True).start()
-                    except Exception as _ee:
-                        logging.error(f"[EVAL-BG] Schedule error: {_ee}")
+                    _schedule_background_eval(cleaned, user_message)
                 return _finalize(cleaned if cleaned else "Je n'ai pas compris.", user_message, msg_type=msg_type, tools_used=_tools_called)
 
             # Ajouter la réponse avec tool_calls — nettoyer le XML leaké de l'historique
             clean_content = msg.get("content", "") or ""
             if "<invoke name=" in clean_content or "<tool_calls>" in clean_content:
-                import re as _re
-                clean_content = _re.sub(r'<invoke name="[^"]+".*?</invoke>', '',
-                                         clean_content, flags=_re.DOTALL).strip()
-                clean_content = _re.sub(r'<tool_calls>.*?</tool_calls>', '',
-                                         clean_content, flags=_re.DOTALL).strip()
+                clean_content = re.sub(r'<invoke name="[^"]+".*?</invoke>', '',
+                                         clean_content, flags=re.DOTALL).strip()
+                clean_content = re.sub(r'<tool_calls>.*?</tool_calls>', '',
+                                         clean_content, flags=re.DOTALL).strip()
             msg["content"] = clean_content
             messages.append(msg)
 
@@ -590,21 +615,34 @@ async def react_loop(user_message: str,
 
             # Exécution groupée : parallèle (search/memory) puis séquentiel (reste)
             _tool_results = []  # [(tname, tc, result)]
-            import asyncio as _asyncio
             _batch_idx = 0
             while _batch_idx < len(_tool_batch):
                 tname, targs, tc = _tool_batch[_batch_idx]
+                # Tous les outils passent par le cache d'abord (P1.7)
+                _cached = cache_get(tname, targs)
+                if _cached is not None:
+                    _tool_results.append((tname, tc, _cached))
+                    _batch_idx += 1
+                    continue
                 if tname in _PARALLEL_TOOLS:
                     # Rassembler tout le groupe parallèle
                     _group = []
                     while _batch_idx < len(_tool_batch) and _tool_batch[_batch_idx][0] in _PARALLEL_TOOLS:
+                        # Vérifier le cache pour chaque outil du groupe avant exécution
+                        _gt, _ga, _gtc = _tool_batch[_batch_idx]
+                        _gcached = cache_get(_gt, _ga)
+                        if _gcached is not None:
+                            _tool_results.append((_gt, _gtc, _gcached))
+                            _batch_idx += 1
+                            continue
                         _group.append(_tool_batch[_batch_idx])
                         _batch_idx += 1
-                    _results = await _asyncio.gather(*[
-                        _asyncio.to_thread(execute_tool, gt, ga)
+                    _results = await asyncio.gather(*[
+                        asyncio.to_thread(execute_tool, gt, ga)
                         for gt, ga, _ in _group
                     ])
                     for (gt, ga, gtc), gr in zip(_group, _results):
+                        cache_set(gt, ga, gr)  # Cache aussi les outils parallèles (P1.7)
                         _tool_results.append((gt, gtc, gr))
                 else:
                     # Cache lookup (Phase 2)
@@ -670,8 +708,7 @@ async def react_loop(user_message: str,
         response = strip_dsml(last_content)
     else:
         # max_iter épuisé sans contenu → message constructif, pas de frustration
-        import logging as _lg
-        _lg.warning("[LOOP] max_iter épuisé sans contenu — réponse partielle")
+        logging.warning("[LOOP] max_iter épuisé sans contenu — réponse partielle")
         response = "Je n'ai pas pu trouver l'information avec les outils disponibles. Peux-tu préciser ta question ou me donner une indication sur où chercher ?"
     return _finalize(response, user_message, msg_type=msg_type, tools_used=_tools_called)
 
@@ -723,13 +760,12 @@ def _finalize(response: str, user_message: str = "", msg_type: str = "", tools_u
 
     # Résumé automatique (Couche Argent) — tâche de fond
     try:
-        import threading as _th
         def _background_summarize():
             try:
                 maybe_auto_summarize()
             except Exception as _se:
                 logging.error(f"[FINALIZE] auto_summarize error: {_se}")
-        _t = _th.Thread(target=_background_summarize, daemon=True)
+        _t = threading.Thread(target=_background_summarize, daemon=True)
         _t.start()
     except Exception as _se:
         logging.error(f"[FINALIZE] auto_summarize schedule error: {_se}")
@@ -737,14 +773,13 @@ def _finalize(response: str, user_message: str = "", msg_type: str = "", tools_u
     # Atlas : apprentissage sémantique (Couche Or) — tâche de fond
     if user_message:
         try:
-            import threading as _th
             def _background_atlas_learn(msg, resp):
                 try:
                     from atlas_engine.atlas import learn as _atlas_learn
                     _atlas_learn(msg, resp)
                 except Exception as _ae:
                     logging.debug(f"[FINALIZE] Atlas background skip: {_ae}")
-            _t = _th.Thread(target=_background_atlas_learn, args=(user_message, response), daemon=True)
+            _t = threading.Thread(target=_background_atlas_learn, args=(user_message, response), daemon=True)
             _t.start()
         except Exception as _ae:
             logging.debug(f"[FINALIZE] Atlas schedule error: {_ae}")

@@ -6,7 +6,7 @@ Met à jour automatiquement :
 - Lignes Python
 - Nombre d'outils
 - Nombre de tests
-- Score benchmark BTR V5
+- Score benchmark Black Intelligence V5
 - Date de mise à jour
 """
 import os, sys, json, re, subprocess
@@ -84,7 +84,7 @@ def get_latest_benchmark():
     """Lit le dernier benchmark."""
     if not os.path.exists(BENCH_RESULTS):
         return None
-    files = [f for f in os.listdir(BENCH_RESULTS) if f.startswith('btr_v5_santana') and f.endswith('.json')]
+    files = [f for f in os.listdir(BENCH_RESULTS) if f.startswith('bi_v5_santana') and f.endswith('.json')]
     if not files:
         return None
     latest = max(files, key=lambda f: os.path.getmtime(os.path.join(BENCH_RESULTS, f)))
@@ -114,7 +114,7 @@ def update_soul_md(lines, tests, tools, bench):
 
     # Ligne "État actuel"
     if bench:
-        new_state = f"État actuel : **{lines}K lignes Python, {tools} outils, {tests} tests, benchmark BTR V5 {bench['score']}/100 ({bench['passed']}/{bench['total']}).**"
+        new_state = f"État actuel : **{lines}K lignes Python, {tools} outils, {tests} tests, benchmark Black Intelligence V5 {bench['score']}/100 ({bench['passed']}/{bench['total']}).**"
     else:
         new_state = f"État actuel : **{lines}K lignes Python, {tools} outils, {tests} tests.**"
     
@@ -160,7 +160,7 @@ def update_arch_md(lines, tests, tools, bench):
 - **{lines:,} lignes Python**
 - **{tools} outils** registrés
 - **{tests} tests** unitaires
-- **Benchmark BTR V5 : {bench['score']}/100** ({bench['passed']}/{bench['total']} tests)""" if bench else f"""## Statistiques ({today})
+- **Benchmark Black Intelligence V5 : {bench['score']}/100** ({bench['passed']}/{bench['total']} tests)""" if bench else f"""## Statistiques ({today})
 
 - **{lines:,} lignes Python**
 - **{tools} outils** registrés
@@ -207,7 +207,7 @@ def update_readme(lines, tests, tools, bench):
 | Lignes Python | **{lines:,}** (après purge) |
 | Outils | **{tools}** |
 | Tests unitaires | **{tests}** |
-| Benchmark BTR V5 | **{bench['score']}/100** ({bench['passed']}/{bench['total']} tests) |
+| Benchmark Black Intelligence V5 | **{bench['score']}/100** ({bench['passed']}/{bench['total']} tests) |
 | Coût/run benchmark | **€{bench['cost']:.4f}** |
 | Latence moyenne | **{bench['latency']/max(bench['total'],1):.2f}s** |
 | Budget mensuel | **~€4.80/mois** |""" if bench else f"""## 📊 Statistiques ({now})

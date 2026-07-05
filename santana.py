@@ -70,8 +70,10 @@ _ATLAS_ENABLED = True
 # cassés ici, faisant planter santana.py au démarrage (NameError sur
 # start_command/handle_message/etc. dès le premier add_handler()). Ces
 # fonctions restent inline tant qu'un vrai module tg_handlers n'existe pas.
+import asyncio
 from telegram import Update
-from core.react_loop import react_loop
+from telegram.constants import ChatAction
+from core.react_loop import react_loop, reset_state as _reset_react_state
 from tools.cost_governor import get_status as _cost_status, reset as _cost_reset
 from agent.context import reset_session as _reset_context_session
 from tools.telegram_stream import TelegramStream
@@ -109,24 +111,51 @@ async def help_command(update: Update, context):
 
 
 async def reset_command(update: Update, context):
-    """Réinitialise le compteur de coût ET le buffer de session."""
+    """Réinitialise COMPLÈTEMENT Santana : coût, session, quarantaine outils, cache, patterns."""
     try:
-        avant = _cost_status()
         _cost_reset()
         _reset_context_session()
+        _reset_react_state()
+        # Nettoyer la mémoire récente (SQLite)
+        try:
+            from memory.memory import clear_short_term
+            clear_short_term()
+        except Exception:
+            pass
+        # Nettoyer les patterns enregistrés
+        try:
+            from agent.patterns import clear_interactions
+            clear_interactions()
+        except Exception:
+            pass
         apres = _cost_status()
         await update.message.reply_text(
-            f"🧹 <b>Session nettoyée</b> ✅\n\n"
+            f"🧹 <b>Santana réinitialisé</b> ✅\n\n"
             f"💰 Budget : <code>${apres['budget']:.4f}</code>\n"
-            f"📉 Utilisé : <code>${apres['cout_cumule']:.4f}</code>\n"
+            f"📉 Utilisé : <code>${apres['cout_cumule_estime']:.6f}</code>\n"
             f"🚦 Niveau : <code>{apres['niveau']}</code>\n"
-            f"⚡ Appels LLM : <code>{apres['appels']}</code>\n\n"
-            f"✅ Tu peux maintenant reparler, le compteur est reparti à zéro.",
+            f"🧊 Quarantaine outils : <code>vidée</code>\n"
+            f"📦 Cache outil : <code>vidé</code>\n"
+            f"🧠 Mémoire session : <code>nettoyée</code>\n"
+            f"⚡ Appels LLM : <code>{apres['appels_estimes']}</code>\n\n"
+            f"✅ Santana est reparti à zéro. Tu peux reparler.",
             parse_mode="HTML",
         )
     except Exception as e:
         logging.error(f"[RESET] Erreur: {e}")
         await update.message.reply_text(f"❌ Erreur reset : {str(e)[:200]}")
+
+
+async def _typing_loop(bot, chat_id: int):
+    """Envoie ChatAction.TYPING toutes les 4s jusqu'à annulation."""
+    try:
+        while True:
+            await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+            await asyncio.sleep(4)
+    except asyncio.CancelledError:
+        pass
+    except Exception as e:
+        logging.debug(f"[TYPING] Boucle terminée: {e}")
 
 
 async def handle_message(update: Update, context):
@@ -136,9 +165,22 @@ async def handle_message(update: Update, context):
         await update.message.reply_text("❌ Non autorisé")
         return
     try:
+        # Lancer le typing indicator immédiatement — coupé dès que le premier
+        # contenu (réel ou heartbeat d'outil) s'affiche réellement à l'écran,
+        # pour ne pas superposer la bulle "typing..." native à un message déjà
+        # visible et en cours d'édition (les deux indicateurs se battaient
+        # sinon pendant toute la durée du streaming).
+        typing_task = asyncio.create_task(_typing_loop(context.bot, chat_id))
         stream = TelegramStream(context.bot, chat_id)
-        response = await react_loop(user_msg, stream_callback=stream.callback)
-        await stream.finalize(response)
+        try:
+            response = await react_loop(user_msg, stream_callback=stream.callback)
+            await stream.finalize(response)
+        finally:
+            typing_task.cancel()
+            try:
+                await typing_task
+            except asyncio.CancelledError:
+                pass
     except Exception as e:
         logging.error(f"[HANDLER] handle_message error: {e}")
         try:

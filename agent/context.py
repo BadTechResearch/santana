@@ -1,9 +1,12 @@
 """context.py — Gestion intelligente du contexte de session Santana.
 
+Optimisé avec buffer RAM + lazy SQLite flush pour éliminer les écritures
+disques à chaque message (gain ~100-150ms par message).
+
 Fonctions :
 - init_session() : crée les tables de session
-- push_exchange() : enregistre un échange utilisateur ↔ Santana
-- get_session_buffer() : retourne le buffer de session (derniers messages)
+- push_exchange() : enregistre un échange (RAM → SQLite toutes les 5 entrées)
+- get_session_buffer() : retourne le buffer depuis la RAM
 - get_session_summary() : retourne le résumé automatique
 - maybe_auto_summarize() : résumé sémantique toutes les N interactions
 - get_context() : assemble le buffer + résumé + compression si nécessaire
@@ -21,20 +24,26 @@ BASE_DIR = os.path.expanduser("~/santana")
 
 # ─── Configuration ─────────────────────────────────────────────────────
 
-# Seuils de compression progressifs (copie du modèle Hermès)
 COMPRESSION_CONFIG = {
-    "buffer_max_messages": 20,       # Messages conservés dans le buffer
-    "summarize_interval": 10,        # Résumé automatique toutes les N interactions
-    "soft_warn_tokens": 4000,        # Alerte si le contexte dépasse 4K tokens
-    "soft_trim_at": 8000,            # Compression douce si > 8K tokens estimés
-    "hard_trim_at": 16000,           # Compression agressive si > 16K tokens
-    "summary_max_chars": 500,        # Longueur max du résumé
-    "protect_last_n": 5,             # Derniers messages protégés de la compression
+    "buffer_max_messages": 20,
+    "summarize_interval": 10,
+    "soft_warn_tokens": 4000,
+    "soft_trim_at": 8000,
+    "hard_trim_at": 16000,
+    "summary_max_chars": 500,
+    "protect_last_n": 5,
 }
 
 SESSION_ID = datetime.now().strftime("%Y-%m-%d_%H")
 MESSAGE_COUNTER = 0
 _INITIALIZED = False
+
+# ─── Buffer RAM (P1.6 — évite SQLite à chaque message) ─────────────────
+# Liste de dicts {"role": str, "content": str, "timestamp": str}
+# Flush différé vers SQLite toutes les FLUSH_INTERVAL entrées
+_RAM_BUFFER: list[dict] = []
+_FLUSH_INTERVAL = 5         # Flush SQLite toutes les 5 entrées
+_FLUSH_COUNTER = 0          # Nombre d'entrées depuis dernier flush
 
 
 # ─── Initialisation ────────────────────────────────────────────────────
@@ -68,43 +77,67 @@ def init_session():
         logging.error(f"[CONTEXT] Session init failure: {e}")
 
 
-# ─── Buffer de session ────────────────────────────────────────────────
+# ─── Buffer de session (RAM + lazy SQLite) ────────────────────────────
 
 def push_exchange(role: str, content: str):
-    """Ajoute un message au buffer de session.
+    """Ajoute un message au buffer — RAM d'abord, SQLite toutes les 5.
 
     Args:
         role: 'user' ou 'assistant'
         content: Contenu du message
     """
-    global MESSAGE_COUNTER
+    global MESSAGE_COUNTER, _FLUSH_COUNTER
     init_session()
+
+    # Ajouter au buffer RAM
+    _RAM_BUFFER.append({
+        "role": role,
+        "content": content[:1000],
+        "timestamp": datetime.now().isoformat(),
+    })
+    # Garder max N messages en RAM
+    while len(_RAM_BUFFER) > COMPRESSION_CONFIG["buffer_max_messages"]:
+        _RAM_BUFFER.pop(0)
+
+    MESSAGE_COUNTER += 1
+    _FLUSH_COUNTER += 1
+
+    # Lazy flush SQLite — seulement toutes les 5 entrées
+    if _FLUSH_COUNTER >= _FLUSH_INTERVAL:
+        _flush_to_sqlite()
+
+
+def _flush_to_sqlite():
+    """Flush différé du buffer RAM vers SQLite."""
+    global _FLUSH_COUNTER
+    if not _RAM_BUFFER:
+        _FLUSH_COUNTER = 0
+        return
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute(
-            "INSERT INTO session_buffer (session_id, role, content) VALUES (?, ?, ?)",
-            (SESSION_ID, role, content[:1000])
-        )
-        conn.commit()
-
-        # Garder seulement les N derniers (soft trim par défaut)
-        max_messages = COMPRESSION_CONFIG["buffer_max_messages"]
+        for entry in _RAM_BUFFER:
+            c.execute(
+                "INSERT INTO session_buffer (session_id, role, content) VALUES (?, ?, ?)",
+                (SESSION_ID, entry["role"], entry["content"])
+            )
+        # Garder max N en SQLite aussi
+        max_m = COMPRESSION_CONFIG["buffer_max_messages"]
         c.execute('''
             DELETE FROM session_buffer WHERE id NOT IN (
                 SELECT id FROM session_buffer
                 WHERE session_id = ?
                 ORDER BY id DESC LIMIT ?
             ) AND session_id = ?
-        ''', (SESSION_ID, max_messages, SESSION_ID))
+        ''', (SESSION_ID, max_m, SESSION_ID))
         conn.commit()
-        MESSAGE_COUNTER += 1
+        _FLUSH_COUNTER = 0
     except Exception as e:
-        logging.error(f"[CONTEXT] Push failure: {e}")
+        logging.error(f"[CONTEXT] SQLite flush failure: {e}")
 
 
 def get_session_buffer(protect_last: int = 0) -> str:
-    """Retourne les messages de la session en cours.
+    """Retourne les messages depuis le buffer RAM.
 
     Args:
         protect_last: Nombre de derniers messages à protéger (ne pas résumer)
@@ -112,37 +145,22 @@ def get_session_buffer(protect_last: int = 0) -> str:
     Returns:
         Texte formaté du buffer, ou "" si vide
     """
-    init_session()
-    try:
-        conn = get_db()
-        c = conn.cursor()
-        c.execute(
-            "SELECT role, content FROM session_buffer WHERE session_id = ? ORDER BY id ASC",
-            (SESSION_ID,)
-        )
-        rows = c.fetchall()
-        if not rows:
-            return ""
-        lines = []
-        for i, (role, content) in enumerate(rows):
-            prefix = "👤 Serge" if role == "user" else "🤖 Santana"
-            # Protéger les derniers messages de la troncature
-            if protect_last and i >= len(rows) - protect_last:
-                lines.append(f"{prefix}: {content}")
-            else:
-                lines.append(f"{prefix}: {content[:300]}")
-        return "\n".join(lines)
-    except Exception as e:
-        logging.error(f"[CONTEXT] Buffer fetch failure: {e}")
+    if not _RAM_BUFFER:
         return ""
+    lines = []
+    for i, entry in enumerate(_RAM_BUFFER):
+        prefix = "👤 Serge" if entry["role"] == "user" else "🤖 Santana"
+        if protect_last and i >= len(_RAM_BUFFER) - protect_last:
+            lines.append(f"{prefix}: {entry['content']}")
+        else:
+            lines.append(f"{prefix}: {entry['content'][:300]}")
+    return "\n".join(lines)
 
 
 # ─── Résumé automatique ───────────────────────────────────────────────
 
 def maybe_auto_summarize():
-    """Toutes les N interactions : résumé sémantique via MiniLM.
-    N = COMPRESSION_CONFIG['summarize_interval']
-    """
+    """Toutes les N interactions : résumé sémantique via MiniLM."""
     global MESSAGE_COUNTER
     interval = COMPRESSION_CONFIG["summarize_interval"]
     if MESSAGE_COUNTER < interval or MESSAGE_COUNTER % interval != 0:
@@ -221,16 +239,12 @@ def get_session_summary() -> str:
 # ─── Estimation tokens ────────────────────────────────────────────────
 
 def estimate_tokens(text: str) -> int:
-    """Estime le nombre de tokens. Version améliorée pour le français.
-
-    Prend en compte la densité lexicale du français (plus de tokens par caractère).
-    """
+    """Estime le nombre de tokens (version française améliorée)."""
     if not text:
         return 0
     words = len(text.split())
     if words < 3:
         return max(1, len(text) // 3)
-    # Français : ~1 token pour 0.75 mot (vs ~1 pour 1.3 mot en anglais)
     return max(1, int(words / 0.75))
 
 
@@ -239,10 +253,10 @@ def estimate_tokens(text: str) -> int:
 def get_context() -> str:
     """Assemble le contexte de session avec compression progressive.
 
-    Compression à 3 niveaux (inspiré du système Hermès) :
-    1. En-dessous de soft_warn_tokens → buffer complet + résumé si existe
-    2. Entre soft_trim_at et hard_trim_at → résumé + buffer protégé (N derniers)
-    3. Au-dessus de hard_trim_at → résumé seul + messages protégés
+    Compression à 3 niveaux :
+    1. < soft_warn_tokens → buffer complet + résumé si existe
+    2. entre soft_trim_at et hard_trim_at → résumé + buffer protégé
+    3. > hard_trim_at → résumé seul + messages protégés
 
     Returns:
         Contexte formaté, ou "" si vide
@@ -259,7 +273,7 @@ def get_context() -> str:
 
     parts = []
 
-    # Niveau 1 : tout va bien
+    # Niveau 1
     if estimated < soft_warn:
         if summary:
             parts.append(f"[RÉSUMÉ SESSION]\n{summary}")
@@ -267,18 +281,17 @@ def get_context() -> str:
             parts.append(f"[SESSION EN COURS]\n{buffer}")
         return "\n\n".join(parts)
 
-    # Niveau 2 : compression douce
+    # Niveau 2
     if estimated < hard_trim:
         if summary:
             parts.append(f"[RÉSUMÉ SESSION]\n{summary}")
-        # Protéger les N derniers messages
         buffer_protected = get_session_buffer(protect_last=protect_n)
         if buffer_protected:
             parts.append(f"[SESSION RÉCENTE]\n{buffer_protected}")
         logging.info(f"[CONTEXT] Compression douce: ~{estimated} tokens → résumé + {protect_n} derniers")
         return "\n\n".join(parts)
 
-    # Niveau 3 : compression agressive
+    # Niveau 3
     buffer_protected = get_session_buffer(protect_last=protect_n)
     if buffer_protected:
         parts.append(f"[SESSION RÉCENTE]\n{buffer_protected}")
@@ -291,8 +304,12 @@ def get_context() -> str:
 # ─── Reset de session ─────────────────────────────────────────────────
 
 def reset_session():
-    """Réinitialise le compteur, l'ID de session et force la réinitialisation des tables."""
-    global SESSION_ID, MESSAGE_COUNTER, _INITIALIZED
+    """Réinitialise le buffer, le compteur et force le flush SQLite."""
+    global SESSION_ID, MESSAGE_COUNTER, _INITIALIZED, _RAM_BUFFER, _FLUSH_COUNTER
+    # Flush avant reset
+    _flush_to_sqlite()
+    _RAM_BUFFER.clear()
     SESSION_ID = datetime.now().strftime("%Y-%m-%d_%H")
     MESSAGE_COUNTER = 0
+    _FLUSH_COUNTER = 0
     _INITIALIZED = False

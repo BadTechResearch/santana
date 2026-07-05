@@ -15,6 +15,36 @@ BASE_DIR = os.path.expanduser("~/santana")
 
 logger = logging.getLogger(__name__)
 
+# ─── Cache des scans statiques (soul/agent/memory/atlas_engine/tests) ────
+# Ces scans ne changent qu'au déploiement (nouveau code, nouveau commit) —
+# avant, ils relisaient TOUS les .py de agent/, memory/, atlas_engine/ et
+# tests/ à CHAQUE tour de la boucle ReAct, dans le chemin critique avant
+# même le premier appel LLM. git et système restent recalculés à chaque
+# appel (peu coûteux, et leur valeur change en cours de session).
+_IDENTITY_CACHE = {"static": None, "mtime": 0.0}
+
+
+def _static_mtime() -> float:
+    """Mtime le plus récent parmi les fichiers scannés par les parties
+    statiques de build_identity()."""
+    latest = 0.0
+    patterns = [
+        os.path.join(BASE_DIR, "soul", "*.md"),
+        os.path.join(BASE_DIR, "agent", "*.py"),
+        os.path.join(BASE_DIR, "memory", "*.py"),
+        os.path.join(BASE_DIR, "atlas_engine", "*.py"),
+        os.path.join(BASE_DIR, "tests", "test_*.py"),
+    ]
+    for pattern in patterns:
+        for fpath in glob.glob(pattern):
+            try:
+                mtime = os.path.getmtime(fpath)
+                if mtime > latest:
+                    latest = mtime
+            except OSError:
+                pass
+    return latest
+
 
 # ─── 1. Scan des fichiers soul/ ───────────────────────────────────────
 
@@ -231,18 +261,34 @@ def scan_system() -> dict:
 
 # ─── Build complet : assemble tout ────────────────────────────────────
 
-def build_identity() -> dict:
-    """Construit la carte d'identité complète de Santana."""
+def _build_identity_static() -> dict:
+    """Les scans coûteux (I/O disque sur agent/memory/atlas_engine/tests/soul)
+    qui ne changent qu'au déploiement — voir _IDENTITY_CACHE ci-dessus."""
     return {
-        "horodatage": datetime.now().isoformat(),
         "soul": scan_soul(),
         "outils": scan_registry(),
         "agent_modules": scan_agent(),
         "memory_modules": scan_memory(),
         "tests": scan_tests(),
-        "git": scan_git(),
-        "systeme": scan_system(),
     }
+
+
+def build_identity() -> dict:
+    """Construit la carte d'identité complète de Santana.
+
+    Les scans de fichiers sont mis en cache et reconstruits seulement si le
+    code a changé depuis (mtime) — git et système restent recalculés à
+    chaque appel."""
+    global _IDENTITY_CACHE
+    latest_mtime = _static_mtime()
+    if _IDENTITY_CACHE["static"] is None or latest_mtime > _IDENTITY_CACHE["mtime"]:
+        _IDENTITY_CACHE["static"] = _build_identity_static()
+        _IDENTITY_CACHE["mtime"] = latest_mtime
+    identity = dict(_IDENTITY_CACHE["static"])
+    identity["horodatage"] = datetime.now().isoformat()
+    identity["git"] = scan_git()
+    identity["systeme"] = scan_system()
+    return identity
 
 
 def build_context() -> str:

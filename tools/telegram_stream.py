@@ -9,8 +9,6 @@ suppression accidentelle (jamais commité en git avant sa perte) — voir
 Convention de préfixes utilisée par react_loop.py :
   - "__MSGTYPE__<TYPE>"  : envoyé une fois avant le premier appel LLM,
     indique le type de message (SOCIAL/FACTUEL/SYNTHESE/DEEP/PERSONNEL).
-  - "__PROGRESS__<texte>" : heartbeat pendant l'exécution d'un outil
-    (toutes les ~2s) — à afficher sans l'accumuler dans le texte final.
   - tout le reste : un chunk de texte réel, à accumuler et afficher.
 """
 
@@ -22,7 +20,7 @@ import time
 logger = logging.getLogger(__name__)
 
 _MAX_MSG_LEN = 4096          # limite Telegram par message
-_EDIT_MIN_INTERVAL = 1.2     # secondes entre deux editMessageText (flood control)
+_EDIT_MIN_INTERVAL = 0.8     # secondes entre deux editMessageText (flood control)
 
 _MSGTYPE_LABEL = {
     "SOCIAL": "",
@@ -124,9 +122,7 @@ class TelegramStream:
             self.msg_type = chunk[len("__MSGTYPE__"):]
             return
         if chunk.startswith("__PROGRESS__"):
-            progress_text = chunk[len("__PROGRESS__"):]
-            self._schedule_edit(self.buffer + "\n\n" + progress_text if self.buffer else progress_text)
-            return
+            return  # Ne pas afficher les heartbeats d'outil (évite le message "⏳ tool en cours...")
         self.buffer += chunk
         self._schedule_edit(self.buffer)
 

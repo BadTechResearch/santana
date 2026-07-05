@@ -8,6 +8,12 @@ OPENROUTER_URL = "https://openrouter.ai/api/v1"
 DEEPSEEK_URL = "https://api.deepseek.com/v1"
 NOUS_URL = "https://inference-api.nousresearch.com/v1"
 
+# Session HTTP persistante (P2.1 — connection pool, évite TCP handshake à chaque appel)
+_HTTP_SESSION = requests.Session()
+_HTTP_SESSION.headers.update({
+    "Content-Type": "application/json",
+})
+
 PROVIDER_CHAIN = []
 
 
@@ -111,7 +117,7 @@ def _provider_complete(provider, messages, model, max_tokens, tools, tool_choice
         body["tools"] = tools
         body["tool_choice"] = tool_choice
     url = f"{provider['url']}/chat/completions"
-    resp = requests.post(url, headers=headers, json=body, timeout=timeout)
+    resp = _HTTP_SESSION.post(url, headers=headers, json=body, timeout=timeout)
     resp.raise_for_status()
     data = resp.json()
     msg = data["choices"][0]["message"]
@@ -177,7 +183,7 @@ def complete_stream(messages, model=None, max_tokens=32000, tools=None, tool_cho
             url = f"{provider['url']}/chat/completions"
             logger.info(f"[STREAM] Appel {provider['name']}/{body['model']} en streaming")
 
-            with requests.post(url, headers=headers, json=body,
+            with _HTTP_SESSION.post(url, headers=headers, json=body,
                                timeout=timeout, stream=True) as resp:
                 resp.raise_for_status()
 

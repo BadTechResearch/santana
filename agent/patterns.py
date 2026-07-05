@@ -255,5 +255,11 @@ def detect_anomalie(sujet: str, timestamp: str | None = None) -> dict:
     }
 
 
+def clear_interactions():
+    """Vide toutes les interactions enregistrées (patterns)."""
+    _save({"interactions": [], "preferences": {}, "corrections": []})
+    logger.info("[PATTERNS] Interactions vidées par /reset")
+
+
 # ─── Sections 3-4 supprimées le 20 juin 2026 : record_preference,
 # get_user_model, record_correction, get_corrections — tous morts.
