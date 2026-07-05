@@ -23,6 +23,9 @@ except (IOError, OSError):
 _RATE_LIMIT: dict[int, float] = {}
 _RATE_WINDOW = 2.0
 
+# ── Boot time pour /status ──
+_BOOT_TIME = __import__('time').time()
+
 from core.utils import load_env, TokenFilter
 load_env(ENV_PATH)
 print(f"[SANTANA BOOT] DEEPSEEK_MODEL='{os.getenv('DEEPSEEK_MODEL', 'NOT_LOADED')}'", flush=True)
@@ -93,7 +96,28 @@ async def start_command(update: Update, context):
 
 
 async def status_command(update: Update, context):
-    await update.message.reply_text("📊 Statut Santana : ✅ opérationnel")
+    """Affiche le statut réel de Santana : uptime, modèle, budget, outils."""
+    import time, os
+    uptime_secs = int(time.time() - _BOOT_TIME)
+    days, rem = divmod(uptime_secs, 86400)
+    hours, rem = divmod(rem, 3600)
+    mins, secs = divmod(rem, 60)
+    uptime_str = f"{days}j {hours}h {mins}m" if days else f"{hours}h {mins}m {secs}s"
+
+    cost = _cost_status()
+    model = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-flash")
+    model_display = model.replace("deepseek/", "")
+
+    msg = (
+        f"🎸 <b>Santana</b> — Statut\n\n"
+        f"⏱️ <b>Uptime :</b> {uptime_str}\n"
+        f"🧠 <b>Modèle :</b> {model_display}\n"
+        f"💰 <b>Coût cumulé :</b> ${cost.get('cout_cumule_reel', 0):.4f}\n"
+        f"📞 <b>Appels API :</b> {cost.get('appels_reussis', 0)}\n"
+        f"💾 <b>Cache DeepSeek :</b> {cost.get('taux_cache_moyen', 0)*100:.0f}%\n"
+        f"📊 <b>Budget :</b> ${cost.get('budget', 0.01):.2f} — {cost.get('niveau', 'OK')}"
+    )
+    await update.message.reply_text(msg, parse_mode="HTML")
 
 
 async def help_command(update: Update, context):

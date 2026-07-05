@@ -516,7 +516,7 @@ async def react_loop(user_message: str,
                     executed_any = False
                     for tname, tbody in xml_tools:
                         tname = tname.strip()
-                        params = _re.findall(r'<parameter name="([^"]+)"[^>]*>(.*?)</parameter>', tbody, _re.DOTALL)
+                        params = re.findall(r'<parameter name="([^"]+)"[^>]*>(.*?)</parameter>', tbody, re.DOTALL)
                         targs = {p[0]: p[1].strip() for p in params}
                         try:
                             tresult = execute_tool(tname, targs)
