@@ -100,18 +100,19 @@ AGPL isn't just a license — it's a commitment. If you build a business on Sant
 
 ---
 
-## 📸 Screenshots
+## 📸 See it in action
 
 <p align="center">
-  <img src="docs/assets/og-image.png" alt="Santana — Social Preview" width="90%">
+  <img src="docs/assets/santana-terminal-demo.gif" alt="Santana — Live terminal demo" width="95%">
   <br>
-  <sub><i>Social preview / OG image — set this as your repo social preview in Settings → Options</i></sub>
+  <sub><i>Santana running live — autonomous ReAct loop, tool selection, memory recall, and cost tracking</i></sub>
 </p>
 
 <p align="center">
-  <img src="docs/assets/screenshot.png" alt="Santana — Terminal &amp; Chat UI" width="90%">
+  <img src="docs/assets/og-image.png" alt="Santana — Social Preview" width="45%">
+  <img src="docs/assets/screenshot.png" alt="Santana — Terminal &amp; Chat UI" width="45%">
   <br>
-  <sub><i>Terminal dashboard &amp; Telegram chat interface</i></sub>
+  <sub><i>Social preview (left) — Terminal dashboard &amp; Telegram chat interface (right)</i></sub>
 </p>
 
 ---
@@ -164,6 +165,7 @@ santana/
 | **📖 [ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Full technical architecture — stack, services, data flow, memory layers |
 | **🤝 [CONTRIBUTING.md](CONTRIBUTING.md)** | How to contribute, set up a dev environment, run tests, submit PRs |
 | **🔒 [SECURITY.md](SECURITY.md)** | Security policy, vulnerability reporting, and built-in security measures |
+| **📜 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** | Community guidelines — be respectful, constructive, and inclusive |
 
 ---
 
