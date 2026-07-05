@@ -113,7 +113,7 @@ class TelegramStream:
         self._edit_lock = asyncio.Lock()
         self._loop = asyncio.get_event_loop()
         self._pending_edit = False
-        self._progress_msg_id: int | None = None
+        # _progress_msg_id supprimé (les progressions outil ne sont plus affichées)
 
     # ── Appelé par react_loop(), depuis un thread — jamais de await ici ──
     def callback(self, chunk: str):
@@ -122,10 +122,13 @@ class TelegramStream:
         if chunk.startswith("__MSGTYPE__"):
             self.msg_type = chunk[len("__MSGTYPE__"):]
             return
+        # ⏳ Progressions outils — supprimées car mal intégrées au streaming.
+        # L'ancienne implémentation envoyait des messages séparés qui
+        # s'accumulaient (échecs d'édition → nouveaux messages) avec des
+        # dots lentes (2s). La seule UX propre serait un suffixe dans le
+        # buffer principal effacé à l'arrivée du contenu réel — pas un
+        # message dédié. Voir https://github.com/openclaw/santana/issues
         if chunk.startswith("__PROGRESS__"):
-            progress_msg = chunk.replace("__PROGRESS__", "").strip()
-            if progress_msg:
-                asyncio.ensure_future(self._send_progress(progress_msg))
             return
         self.buffer += chunk
         self._schedule_edit(self.buffer)
@@ -199,23 +202,7 @@ class TelegramStream:
         except Exception as e2:
             logger.error("[TG_STREAM] Échec envoi (HTML et texte brut): %s", e2)
 
-    async def _send_progress(self, msg: str) -> None:
-        """Envoie un message de progression visible pour les outils longs."""
-        try:
-            if self._progress_msg_id:
-                await self.bot.edit_message_text(
-                    chat_id=self.chat_id,
-                    message_id=self._progress_msg_id,
-                    text=msg[:4000],
-                )
-            else:
-                sent = await self.bot.send_message(
-                    chat_id=self.chat_id,
-                    text=msg[:4000],
-                )
-                self._progress_msg_id = sent.message_id
-        except Exception:
-            self._progress_msg_id = None
+
 
     async def finalize(self, response: str):
         """Envoie la réponse finale, propre (sans curseur), en la découpant

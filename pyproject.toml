@@ -31,7 +31,6 @@ dependencies = [
     "distro>=1.9.0",
     "edge-tts>=7.2.8",
     "fake-useragent>=2.2.0",
-    "faster-whisper>=1.2.1",
     "feedparser>=6.0.12",
     "filelock>=3.29.0",
     "Flask>=3.1.3",

@@ -11,8 +11,9 @@ Met à jour automatiquement :
 """
 import os, sys, json, re, subprocess
 from datetime import datetime
+from core.utils import get_base_dir
 
-BASE = os.path.expanduser("~/santana")
+BASE = get_base_dir()
 SOUL = os.path.join(BASE, "soul", "SOUL.md")
 ARCH = os.path.join(BASE, "ARCHITECTURE.md")
 README = os.path.join(BASE, "README.md")

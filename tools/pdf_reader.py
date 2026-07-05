@@ -3,9 +3,10 @@ Permet à Santana d'extraire le texte de fichiers PDF (uploads, pièces jointes,
 
 import os
 import logging
+from core.utils import get_base_dir
 
 # ─── Extractions supportées ───────────────────────────────────────────────
-SAFE_BASE = os.path.expanduser("~/santana")
+SAFE_BASE = get_base_dir()
 
 
 def read_pdf(path: str, max_chars: int = 10000) -> str:

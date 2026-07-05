@@ -6,6 +6,7 @@ Usage :
     json_log("tool_call", tool="web_search", duration_ms=1200, status="ok")
 """
 
+from core.utils import get_base_dir
 import json
 import logging
 import os
@@ -14,7 +15,7 @@ from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
 
-_LOG_DIR = os.path.expanduser("~/santana")
+_LOG_DIR = get_base_dir()
 _STRUCTURED_LOG_PATH = os.path.join(_LOG_DIR, "events.jsonl")
 
 

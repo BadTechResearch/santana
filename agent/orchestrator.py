@@ -8,8 +8,9 @@ Extrait de core/react_loop.py pour alléger la boucle principale.
 import os
 import logging
 from datetime import datetime
+from core.utils import get_base_dir
 
-BASE_DIR = os.path.expanduser("~/santana")
+BASE_DIR = get_base_dir()
 SOUL_DIR = os.path.join(BASE_DIR, "soul")
 
 # ─── Cache prompt incrémental ─────────────────────────────────────────────
@@ -280,7 +281,7 @@ def build_system_prompt(user_message: str = "", msg_type: str = None) -> str:
     # Profil utilisateur injecté (Phase 1 — P1)
     try:
         import os as _os
-        _pf = _os.path.expanduser("~/santana/skills/profile-serge.md")
+        _pf = _os.path.join(get_base_dir(), "skills/profile-serge.md")
         if _os.path.exists(_pf):
             with open(_pf) as _f:
                 _profile = _f.read()

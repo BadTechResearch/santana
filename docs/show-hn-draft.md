@@ -50,7 +50,7 @@ Comparable hosted agents charge $50-200/mo.
 2. **Summaries** — compressed history for long-term context
 3. **SQLite vector store** — embeddings for semantic retrieval (all-MiniLM-L6-v2)
 
-Memory persists across restarts, sessions, and platforms. Talk to it on Telegram, then ask on Discord "what were we working on yesterday?" — it remembers.
+Memory persists across restarts, sessions, and platforms. Talk to it on Telegram, then ask later "what were we working on yesterday?" — it remembers.
 
 ## Tools (15+)
 

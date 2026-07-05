@@ -15,8 +15,9 @@ Fusionne les capacités du Steward (scoring, filtrage, détection) et du Writer
 import os, re, json, logging, sqlite3
 from datetime import datetime
 from core.db import get_db
+from core.utils import get_base_dir
 
-BASE_DIR = os.path.expanduser("~/santana")
+BASE_DIR = get_base_dir()
 MEMORY_DIR = os.path.join(BASE_DIR, "memory")
 DB_PATH = os.path.join(BASE_DIR, "memory.db")
 
@@ -535,7 +536,6 @@ def learn(user_message: str, santana_response: str = ""):
         santana_response: Réponse de Santana
     """
     try:
-        from core.utils import strip_dsml
         santana_response = strip_dsml(santana_response)
     except Exception as e:
         logging.error("[ATLAS] strip_dsml fallback in learn() failed: %s", e)

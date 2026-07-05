@@ -7,11 +7,11 @@
 | Couche | Technologie | Rôle |
 |--------|-------------|------|
 | **LLM Principal** | DeepSeek V4 Flash (api.deepseek.com) | Génération de réponses (tokens texte) |
-| **Fallback 1** | Nous/StepFun (step-3.7-flash:free) | Secondaire si DeepSeek indisponible |
+| **Fallback 1** | DeepSeek (fallback via OpenRouter) | Secondaire si DeepSeek direct indisponible |
 | **Fallback 2** | OpenRouter (deepseek/deepseek-v4-flash) | Troisième ligne si les deux premiers échouent |
 | **Mémoire persistante** | SQLite WAL (centralisé via `core/db.py`) | Embeddings vectoriels + données structurées |
 | **Embeddings** | sentence-transformers all-MiniLM-L6-v2 | Vectorisation locale, recherche sémantique |
-| **Messagerie** | python-telegram-bot / discord.py | Canaux Telegram et Discord |
+| **Messagerie** | python-telegram-bot | Canal Telegram |
 | **API** | Flask | Interface REST, endpoints webhooks |
 | **Recherche web** | Serper API | Recherche Google en temps réel |
 | **Exécution code** | Subprocess sandboxé | Python/Bash/JS en environnement contrôlé |
@@ -21,7 +21,7 @@
 
 | Service | Rôle | Dépendances |
 |---------|------|-------------|
-| `santana.service` | Agent principal (Telegram + Discord + API) | réseau, disque (SQLite WAL) |
+| `santana.service` | Agent principal (Telegram + API) | réseau, disque (SQLite WAL) |
 
 Architecture mono-service : un seul processus Python (`santana.py`) sert tous les canaux.
 Le multi-threading est géré en interne (boucle asyncio + délégation thread-safe).
@@ -149,12 +149,12 @@ santana/
 | Usage | Fournisseur | Modèle | Coût |
 |-------|-------------|--------|------|
 | **LLM Principal** | DeepSeek (direct) | deepseek-v4-flash | $0.14/M input (cache miss), $0.0028/M (cache hit), $0.28/M output |
-| **LLM Fallback 1** | Nous/StepFun | step-3.7-flash:free | Gratuit |
+| **LLM Fallback 1** | OpenRouter (DeepSeek V4 Flash) | deepseek/deepseek-v4-flash | Redondance |
 | **LLM Fallback 2** | OpenRouter | deepseek/deepseek-v4-flash | $0.14/M input, $0.28/M output |
 | **Embeddings** | Local (sentence-transformers) | all-MiniLM-L6-v2 | Gratuit |
 | **Recherche web** | Serper API | — | Payant (facturation au hit) |
 
-La chaîne de providers (`core/provider.py`) tente DeepSeek direct en premier. Si DeepSeek échoue (timeout, erreur API, saturation), le fallback tente Nous/StepFun, puis OpenRouter.
+La chaîne de providers (`core/provider.py`) tente DeepSeek direct en premier. Si DeepSeek échoue (timeout, erreur API, saturation), le fallback tente OpenRouter (DeepSeek V4 Flash), puis Groq (Llama 3.3 70B).
 
 ## Gouverneur de coûts
 
@@ -175,7 +175,7 @@ Budget par défaut : $0.01 (configurable via `DEEPSEEK_COST_LIMIT`).
 ## Flux de traitement d'un message
 
 ```
-Message entrant (Telegram / Discord / API)
+Message entrant (Telegram / API)
     │
     ├──→ Provider Chain
     │      1. core/provider.py sélectionne le provider actif
@@ -206,7 +206,6 @@ Message entrant (Telegram / Discord / API)
 | Plateforme | Technologie | État |
 |------------|-------------|------|
 | **Telegram** | python-telegram-bot | ✅ Production |
-| **Discord** | discord.py | 🔧 Planifié (non implémenté) |
 | **API REST** | Flask | 🔧 Planifié (non implémenté) |
 
 ## Sécurité

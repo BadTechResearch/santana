@@ -18,8 +18,9 @@ import json
 import sqlite3
 import argparse
 from datetime import datetime
+from core.utils import get_base_dir
 
-BASE_DIR = os.path.expanduser("~/santana")
+BASE_DIR = get_base_dir()
 DB_PATH = os.path.join(BASE_DIR, "data", "workspace.db")
 MAX_HISTORY = 100  # garder les 100 derniers enregistrements
 

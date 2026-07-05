@@ -22,9 +22,10 @@ import subprocess
 from datetime import datetime
 
 from metrics import track
+from core.utils import get_base_dir
 
 # ── Configuration ──────────────────────────────────────────────────────────
-BASE_DIR = os.path.expanduser("~/santana")
+BASE_DIR = get_base_dir()
 GIT_CACHE = os.path.join(BASE_DIR, "github_cache")
 SSH_KEY = os.path.expanduser("~/.ssh/github_obsidian")
 GIT_SSH_CMD = f"ssh -i {SSH_KEY} -o StrictHostKeyChecking=no"

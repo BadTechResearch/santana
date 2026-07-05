@@ -95,7 +95,7 @@ AGPL isn't just a license — it's a commitment. If you build a business on Sant
 | 💰 **Cost Governor** | Budget-aware LLM calls with ALERT/THROTTLE/STOP thresholds |
 | 🔄 **Self-Awareness** | Dynamic self-model analysis via `self.py` — knows its own code, tools, and prompt |
 | 🔒 **Secure VM** | Whitelist-based command execution, restricted terminal, .env protection |
-| 📡 **Multi-Platform** | Telegram, Discord, and REST API — unified agent loop |
+| 📡 **Multi-Platform** | Telegram and REST API — unified agent loop |
 | 🧪 **Test Suite** | Reference test suite (`test_system_integrity.py` + unit tests) |
 
 ---

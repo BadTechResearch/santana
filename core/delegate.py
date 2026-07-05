@@ -8,10 +8,17 @@ et retourne un résultat consolidé.
 
 import json
 import logging
+import threading
 import time
 import uuid
 
 logger = logging.getLogger(__name__)
+
+# Verrou pour le swap de SESSION_ID : évite que deux appels concurrents
+# à delegate_task() corrompent le session_id du parent. Même si le code
+# n'est pas encore dans _PARALLEL_TOOLS, ce verrou prévient le pattern
+# de race condition identifié dans l'audit juillet 2026.
+_session_lock = threading.Lock()
 
 
 async def delegate_task(goal: str, context: str = "") -> str:
@@ -42,7 +49,8 @@ async def delegate_task(goal: str, context: str = "") -> str:
     # dans _PARALLEL_TOOLS (pas d'exécution concurrente avec le thread appelant
     # pendant que ce swap est actif).
     _parent_session_id = _ctx.SESSION_ID
-    _ctx.SESSION_ID = f"delegate-{task_id}-{uuid.uuid4()}"
+    with _session_lock:
+        _ctx.SESSION_ID = f"delegate-{task_id}-{uuid.uuid4()}"
 
     try:
         # Construire un message pour la sous-boucle
@@ -67,4 +75,5 @@ async def delegate_task(goal: str, context: str = "") -> str:
         logger.error(f"[DELEGATE] Tâche {task_id} échouée ({elapsed:.1f}s): {e}")
         return json.dumps({"task_id": task_id, "error": str(e), "duration_s": round(elapsed, 1)})
     finally:
-        _ctx.SESSION_ID = _parent_session_id
+        with _session_lock:
+            _ctx.SESSION_ID = _parent_session_id

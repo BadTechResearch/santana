@@ -1,4 +1,4 @@
-"""Provider LLM pour Santana — DeepSeek direct en premier, OpenRouter fallback."""
+"""Provider LLM pour Santana — DeepSeek natif, OpenRouter fallback, Groq gratuit."""
 import json, logging, os, requests, time
 from typing import Generator
 
@@ -6,9 +6,9 @@ logger = logging.getLogger(__name__)
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1"
 DEEPSEEK_URL = "https://api.deepseek.com/v1"
-NOUS_URL = "https://inference-api.nousresearch.com/v1"
+GROQ_URL = "https://api.groq.com/openai/v1"
 
-# Session HTTP persistante (P2.1 — connection pool, évite TCP handshake à chaque appel)
+# Session HTTP persistante (connection pool, évite TCP handshake à chaque appel)
 _HTTP_SESSION = requests.Session()
 _HTTP_SESSION.headers.update({
     "Content-Type": "application/json",
@@ -22,9 +22,7 @@ def _init_providers():
     PROVIDER_CHAIN = []
     env = _get_env()
 
-    # DeepSeek DIRECT en premier (provider principal — unique provider réel)
-    # DeepSeek V4 Flash natif, le plus rapide (~200ms), coût réel le plus bas
-    # grâce au cache hit (94-96% sur les sessions Serge = $0.0028/1M au lieu de $0.14)
+    # 1. DeepSeek DIRECT — provider principal
     if env.get("deepseek_key"):
         PROVIDER_CHAIN.append({
             "name": "deepseek",
@@ -33,18 +31,7 @@ def _init_providers():
             "model": env.get("deepseek_model", "deepseek-v4-flash"),
         })
 
-    # Nous Portal (StepFun free) en deuxième — fallback léger, gratuit
-    # Utilisé uniquement par Hermès Agent, pas par Santana en production.
-    # Modèle : stepfun/step-3.7-flash:free
-    if env.get("nous_key"):
-        PROVIDER_CHAIN.append({
-            "name": "nous",
-            "key": env["nous_key"],
-            "url": NOUS_URL,
-            "model": env.get("nous_model", "stepfun/step-3.7-flash:free"),
-        })
-
-    # OpenRouter en troisième fallback (DeepSeek V4 Flash via API)
+    # 2. OpenRouter — fallback (DeepSeek V4 Flash)
     if env.get("openrouter_key"):
         PROVIDER_CHAIN.append({
             "name": "openrouter",
@@ -53,13 +40,22 @@ def _init_providers():
             "model": env.get("openrouter_model", "deepseek/deepseek-v4-flash"),
         })
 
+    # 3. Groq — fallback gratuit (Llama 3.3 70B)
+    if env.get("groq_key"):
+        PROVIDER_CHAIN.append({
+            "name": "groq",
+            "key": env["groq_key"],
+            "url": GROQ_URL,
+            "model": env.get("groq_model", "llama-3.3-70b-versatile"),
+        })
+
 
 def _get_env():
     return {
-        "nous_key": os.getenv('NOUS_API_KEY', '').strip(),
-        "nous_model": os.getenv('NOUS_MODEL', 'stepfun/step-3.7-flash:free').strip(),
         "openrouter_key": os.getenv('OPENROUTER_API_KEY', '').strip(),
         "openrouter_model": os.getenv('OPENROUTER_MODEL', 'deepseek/deepseek-v4-flash').strip(),
+        "groq_key": os.getenv('GROQ_API_KEY', '').strip(),
+        "groq_model": os.getenv('GROQ_MODEL', 'llama-3.3-70b-versatile').strip(),
         "deepseek_key": os.getenv('DEEPSEEK_API_KEY', '').strip(),
         "deepseek_model": os.getenv('DEEPSEEK_MODEL', 'deepseek-v4-flash').strip(),
     }
@@ -73,19 +69,7 @@ def _provider_headers(provider: dict) -> dict:
 
 
 def complete(messages, model=None, max_tokens=32000, tools=None, tool_choice='auto', timeout=120):
-    """Appel LLM bloquant — fallback sur chaque provider jusqu'au premier succès.
-
-    Args:
-        messages: liste de dicts [{"role": "user", "content": "..."}]
-        model: override du modèle (None = utiliser celui du provider)
-        max_tokens: max tokens de sortie (défaut 32000)
-        tools: liste d'outils OpenAI function-calling
-        tool_choice: 'auto' ou 'none'
-        timeout: timeout HTTP en secondes (défaut 120)
-
-    Returns:
-        dict avec "message" (role + content + optionnel tool_calls) et "finish_reason"
-    """
+    """Appel LLM bloquant — fallback sur chaque provider jusqu'au premier succès."""
     if not PROVIDER_CHAIN:
         _init_providers()
     if not PROVIDER_CHAIN:
@@ -123,12 +107,11 @@ def _provider_complete(provider, messages, model, max_tokens, tools, tool_choice
     msg = data["choices"][0]["message"]
     finish_reason = data["choices"][0].get("finish_reason", "stop")
 
-    # Gère le format StepFun : met le contenu reasoning dans content si content est vide
     content = msg.get("content")
     if not content and msg.get("reasoning"):
         content = msg["reasoning"]
 
-    # ── Usage réel DeepSeek : tokens consommés (coût réel) ──
+    # Enregistrer les tokens consommés
     usage = data.get("usage", {})
     if usage:
         try:
@@ -155,12 +138,7 @@ def _provider_complete(provider, messages, model, max_tokens, tools, tool_choice
 def complete_stream(messages, model=None, max_tokens=32000, tools=None, tool_choice='auto', timeout=120, **kwargs):
     if kwargs:
         logger.debug(f"[STREAM] Ignored kwargs: {kwargs}")
-    """Vrai streaming LLM — yield chaque token en temps réel via SSE.
-
-    Itère sur les providers dans PROVIDER_CHAIN jusqu'au premier succès.
-    Yield `{'type': 'content', 'content': token}` pour chaque token.
-    Yield `{'type': 'complete', ...}` à la fin.
-    """
+    """Vrai streaming LLM — yield chaque token en temps réel via SSE."""
     if not PROVIDER_CHAIN:
         _init_providers()
     if not PROVIDER_CHAIN:
@@ -189,37 +167,20 @@ def complete_stream(messages, model=None, max_tokens=32000, tools=None, tool_cho
 
                 content = ""
                 reasoning = ""
-                tool_calls_parts = {}  # index -> {id, name, args_buffer}
+                tool_calls_parts = {}
                 finish_reason = "stop"
 
-                # StepFun (Nous Portal) a un charset bugué en streaming
-                # On utilise decode_unicode=True pour les autres providers
-                use_raw = provider["name"] == "nous"
-
-                for line in resp.iter_lines(decode_unicode=not use_raw):
+                for line in resp.iter_lines(decode_unicode=True):
                     if not line:
                         continue
-                    if use_raw:
-                        # StepFun : decoder manuellement en UTF-8
-                        if not line.startswith(b"data: "):
-                            continue
-                        payload = line[6:]
-                        if payload == b"[DONE]":
-                            break
-                        try:
-                            payload_str = payload.decode("utf-8")
-                        except UnicodeDecodeError:
-                            continue
-                    else:
-                        if not line.startswith("data: "):
-                            continue
-                        payload = line[6:]
-                        if payload == "[DONE]":
-                            break
-                        payload_str = payload
+                    if not line.startswith("data: "):
+                        continue
+                    payload = line[6:]
+                    if payload == "[DONE]":
+                        break
 
                     try:
-                        chunk = json.loads(payload_str)
+                        chunk = json.loads(payload)
                     except json.JSONDecodeError:
                         continue
 
@@ -230,19 +191,16 @@ def complete_stream(messages, model=None, max_tokens=32000, tools=None, tool_cho
                     delta = choices[0].get("delta", {})
                     f_reason = choices[0].get("finish_reason")
 
-                    # Contenu textuel
                     if "content" in delta and delta["content"]:
                         token = delta["content"]
                         content += token
                         yield {'type': 'content', 'content': token}
 
-                    # Raisonnement (DeepSeek R1: reasoning_content, StepFun: reasoning)
                     if "reasoning_content" in delta and delta["reasoning_content"]:
                         reasoning += delta["reasoning_content"]
                     elif "reasoning" in delta and delta["reasoning"]:
                         reasoning += delta["reasoning"]
 
-                    # Tool calls
                     if "tool_calls" in delta:
                         for tc in delta["tool_calls"]:
                             idx = tc.get("index", 0)
@@ -261,11 +219,9 @@ def complete_stream(messages, model=None, max_tokens=32000, tools=None, tool_cho
                                 if tc["function"].get("arguments"):
                                     part["arguments"] += tc["function"]["arguments"]
 
-                    # Finish reason
                     if f_reason:
                         finish_reason = f_reason
 
-                # Assembler les tool_calls finaux
                 tool_calls = None
                 if tool_calls_parts:
                     tool_calls = []
@@ -281,13 +237,12 @@ def complete_stream(messages, model=None, max_tokens=32000, tools=None, tool_cho
                         })
 
                 logger.info(f"[STREAM] Termine: {len(content)} chars, outils={'oui' if tool_calls else 'non'}")
-                # StepFun place parfois la réponse dans reasoning sans jamais la mettre dans content
                 resolved_content = content or reasoning or ""
                 yield {'type': 'complete', 'content': resolved_content,
                        'finish_reason': finish_reason,
                        'tool_calls': tool_calls,
                        'reasoning_content': reasoning or None}
-            return  # Succès → sortir de la boucle
+            return
 
         except requests.exceptions.HTTPError as e:
             last_error = e

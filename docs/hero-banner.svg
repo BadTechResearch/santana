@@ -52,7 +52,7 @@
   <text x="80" y="318" font-family="monospace" font-size="13" fill="#a78bfa">  ✓ Vector store loaded (1,247 embeddings)</text>
   <text x="80" y="338" font-family="monospace" font-size="13" fill="#a78bfa">  ✓ Cost governor: $8.42/mo budget remaining</text>
   <text x="80" y="358" font-family="monospace" font-size="13" fill="#a78bfa">  ✓ Telegram bot connected</text>
-  <text x="80" y="378" font-family="monospace" font-size="13" fill="#a78bfa">  ✓ Discord gateway active</text>
+  <text x="80" y="378" font-family="monospace" font-size="13" fill="#a78bfa">  ✓ HTTP API ready</text>
   <text x="80" y="398" font-family="monospace" font-size="13" fill="#a78bfa">  ✓ REST API running on :8080</text>
   <text x="80" y="430" font-family="monospace" font-size="13" fill="#2dd4bf">  ● Agent running — listening for requests...</text>
   <text x="80" y="456" font-family="monospace" font-size="11" fill="#666">  [04:32:17] Memory consolidation cycle in 12m</text>
@@ -102,6 +102,6 @@
   <circle cx="1155" cy="495" r="3" fill="#2dd4bf" filter="url(#glow)"/>
 
   <!-- Bottom stats bar -->
-  <text x="640" y="585" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#888">⚡ DeepSeek V4 Flash  ·  🗄️ SQLite  ·  🐙 GitHub  ·  💬 Telegram/Discord</text>
+  <text x="640" y="585" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#888">⚡ DeepSeek V4 Flash  ·  🗄️ SQLite  ·  🐙 GitHub  ·  💬 Telegram/API</text>
   <text x="640" y="610" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#555">~$7/mo VM  ·  ~$9/mo inference  ·  No Docker/Redis/Postgres</text>
 </svg>

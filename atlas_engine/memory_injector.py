@@ -15,8 +15,9 @@ from core.db import get_db
 import logging
 
 from datetime import datetime
+from core.utils import get_base_dir
 
-BASE_DIR = os.path.expanduser("~/santana")
+BASE_DIR = get_base_dir()
 MEMORY_DIR = os.path.join(BASE_DIR, "memory")
 DB_PATH = os.path.join(BASE_DIR, "memory.db")
 

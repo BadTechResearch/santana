@@ -15,8 +15,9 @@ import os
 import sqlite3
 import logging
 import threading
+from core.utils import get_base_dir
 
-BASE_DIR = os.path.expanduser("~/santana")
+BASE_DIR = get_base_dir()
 # Nom historique DB_PATH conservé (pas MEMORY_DB) : plusieurs tests
 # (test_context.py, test_memory.py, test_100_memoire.py, test_tools.py)
 # monkeypatchent `core.db.DB_PATH` directement pour isoler leurs écritures

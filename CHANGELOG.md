@@ -14,7 +14,7 @@
 - **💰 Cost Governor** : alertes/ralentissement/arrêt selon des seuils configurables
 - **🔄 Auto-analyse dynamique** (`self.py`) — l'agent connaît son propre code, ses outils et son prompt
 - **🔒 Sécurité** : whitelist de commandes, terminal restreint, protection `.env`
-- **📡 Multi-plateforme** : Telegram, Discord, API REST — boucle agent unifiée
+- **📡 Multi-plateforme** : Telegram, API REST — boucle agent unifiée
 - **🧪 Suite de tests** : suite complète de tests unitaires + test_system_integrity.py
 
 ### 🛠️ Infrastructure

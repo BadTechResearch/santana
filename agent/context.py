@@ -19,8 +19,9 @@ import logging
 from datetime import datetime
 
 from core.db import get_db
+from core.utils import get_base_dir
 
-BASE_DIR = os.path.expanduser("~/santana")
+BASE_DIR = get_base_dir()
 
 # ─── Configuration ─────────────────────────────────────────────────────
 

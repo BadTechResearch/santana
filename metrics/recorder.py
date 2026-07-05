@@ -24,11 +24,12 @@ import sqlite3
 import threading
 import functools
 from typing import Callable, Optional, Type
+from core.utils import get_base_dir
 
 logger = logging.getLogger("metrics.recorder")
 
 # Chemin de la base de métriques dédiée
-METRICS_DB_PATH = os.path.expanduser("~/santana/metrics.db")
+METRICS_DB_PATH = os.path.join(get_base_dir(), "metrics.db")
 
 # Thread-local storage pour les connexions metrics.db
 _local = threading.local()

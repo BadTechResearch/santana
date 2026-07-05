@@ -12,8 +12,9 @@ import threading
 import time
 from typing import Optional
 from queue import Queue, Empty
+from core.utils import get_base_dir
 
-BASE_DIR = os.path.expanduser("~/santana")
+BASE_DIR = get_base_dir()
 CONFIG_PATH = os.path.join(BASE_DIR, "mcp_config.json")
 
 # Cache des connexions : {name: {"proc": subprocess, "tools": [...], "lock": Lock}}

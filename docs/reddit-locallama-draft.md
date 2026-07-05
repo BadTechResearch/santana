@@ -23,7 +23,7 @@ The agent runs on a single GCP e2-micro VM (2GB RAM, no GPU). The embedding mode
 2. Text summaries (compressed history)
 3. SQLite vector store (semantic retrieval)
 
-This lets the agent remember things across days and platforms — I can ask it on Discord about something we discussed on Telegram yesterday.
+This lets the agent remember things across days and platforms — I can ask it on Telegram about something we discussed earlier.
 
 **Tools:**
 - Web search (Google + social via Serper API)

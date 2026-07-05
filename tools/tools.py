@@ -19,12 +19,13 @@ from metrics import track
 
 # ─── Registry (découverte automatique d'outils) ──────────────────────────────
 from tools.registry import register as _reg_register, dispatch as _reg_dispatch, get_tools as _reg_get_tools
+from core.utils import get_base_dir
 
 # ─── Auth serveurs auxiliaires ──────────────────────────────────────────────
 _MCP_API_KEY = os.getenv("MCP_API_KEY", "")
 _MCP_HEADERS = {"X-API-Key": _MCP_API_KEY} if _MCP_API_KEY else {}
 
-BASE_DIR = os.path.expanduser("~/santana")
+BASE_DIR = get_base_dir()
 
 # Outils de base (définition JSON pour le LLM)
 TOOLS = json.load(open(os.path.join(BASE_DIR, "tools", "tools.json"), "r"))
@@ -216,7 +217,7 @@ def tool_social_search(query="", platform="all", count=5) -> str:
 # Voir tools/registry.py pour l'API : @tool(), register(), dispatch(), get_tools()
 # ─── FS_READ — Lecture locale de fichiers (auto-introspection) ───────────────
 
-_SAFE_BASE = os.path.expanduser("~/santana")
+_SAFE_BASE = get_base_dir()
 _SENSITIVE_FRAGMENTS = [
     "token", "secret", "key", "password", ".env",
     "credential", "private", "auth"

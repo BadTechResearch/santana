@@ -12,10 +12,11 @@ import glob
 import logging
 import os
 import re
+from core.utils import get_base_dir
 
 logger = logging.getLogger(__name__)
 
-SKILLS_DIR = os.path.expanduser("~/santana/skills")
+SKILLS_DIR = os.path.join(get_base_dir(), "skills")
 _FRONTMATTER_RE = re.compile(r'^---\s*\n(.*?)\n---\s*\n(.*)', re.DOTALL)
 _VALID_NAME = re.compile(r'^[a-zA-Z0-9_-]+$')
 

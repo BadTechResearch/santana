@@ -4,7 +4,7 @@
 
 ---
 
-**Santana** is an autonomous AI agent I've been running for weeks on a GCP e2-micro (2 vCPUs, 2GB RAM, ~$7/mo). It has persistent memory (remembers conversations across sessions), web search, GitHub integration, sandboxed code execution, and talks to me on Telegram and Discord.
+**Santana** is an autonomous AI agent I've been running for weeks on a GCP e2-micro (2 vCPUs, 2GB RAM, ~$7/mo). It has persistent memory (remembers conversations across sessions), web search, GitHub integration, sandboxed code execution, and talks to me on Telegram.
 
 The key design constraint: **zero infrastructure**. No Docker, no Redis, no PostgreSQL. The whole thing is a single Python 3.11+ process using SQLite in WAL mode. It costs ~$8-10/mo in LLM inference (DeepSeek V4 Flash with 95% cache hit rate).
 
@@ -15,7 +15,7 @@ The key design constraint: **zero infrastructure**. No Docker, no Redis, no Post
 - Remembers what we discussed days ago (3-layer memory: session buffer → summaries → SQLite vector embeddings)
 - Runs code in a sandboxed subprocess
 - Monitors its own spending and throttles itself when over budget
-- Available on Telegram, Discord, and REST API
+- Available on Telegram and REST API
 
 ## The frugal stack
 

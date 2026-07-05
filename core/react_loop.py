@@ -12,7 +12,7 @@ from deepseek_client import complete, complete_stream
 from tools.tools import execute_tool, TOOLS
 from tools.cost_governor import check_cost_governor, estimate_cost_from_messages, record_usage
 from memory.memory import get_recent_memory
-from core.utils import strip_dsml
+from core.utils import strip_dsml, get_base_dir
 from agent.orchestrator import build_system_prompt, classify_message
 from agent.context import push_exchange, maybe_auto_summarize, init_session as init_context_session
 from core.disambiguate import disambiguate
@@ -211,8 +211,15 @@ def _get_tool_progress(tname: str, targs: dict) -> str:
 
 
 def _run_tool_with_heartbeat(tname: str, targs: dict,
-                              stream_callback) -> str:
-    """Execute un outil avec heartbeat de progression pendant l'attente."""
+                              stream_callback=None) -> str:
+    """Execute un outil avec heartbeat silencieux.
+
+    Les progressions __PROGRESS__ ont été supprimées : elles créaient des
+    messages Telegram séparés qui s'accumulaient (échecs d'édition) sans
+    apporter de valeur utilisateur réelle. Le heartbeat ne sert plus qu'à
+    éviter de bloquer la boucle asynchrone sur les outils lents (web_search,
+    code_exec, etc.) avec un timeout technique.
+    """
     result = {"val": "", "done": False}
 
     def _run():
@@ -225,21 +232,15 @@ def _run_tool_with_heartbeat(tname: str, targs: dict,
     t = threading.Thread(target=_run, daemon=True)
     t.start()
 
-    start_ts = time.time()
-    dot_count = 0
+    # Boucle d'attente silencieuse (pas de progression utilisateur)
     while not result["done"]:
-        time.sleep(2.0)
-        if stream_callback:
-            dot_count = (dot_count % 3) + 1  # 1→2→3→1...
-            dots = "•" * dot_count
-            elapsed = int(time.time() - start_ts)
-            stream_callback(f"__PROGRESS__⏳ {tname} en cours{dots} ({elapsed}s)\n\n")
+        time.sleep(1.0)
 
     t.join(timeout=1)
     return result["val"]
 
 
-BASE_DIR = os.path.expanduser("~/santana")
+BASE_DIR = get_base_dir()
 SOUL_DIR = os.path.join(BASE_DIR, "soul")
 DB_PATH = os.path.join(BASE_DIR, "memory.db")
 

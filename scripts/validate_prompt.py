@@ -17,11 +17,12 @@ import os
 import sys
 import logging
 import traceback
+from core.utils import get_base_dir
 
 # Supprimer les logs pendant la validation
 logging.disable(logging.CRITICAL)
 
-BASE_DIR = os.path.expanduser("~/santana")
+BASE_DIR = get_base_dir()
 os.chdir(BASE_DIR)
 sys.path.insert(0, BASE_DIR)
 

@@ -6,7 +6,7 @@ import os, json, logging, asyncio, fcntl, signal, sys, time, subprocess
 from datetime import datetime
 import pytz; _TZ = pytz.timezone("Europe/Brussels")
 
-BASE_DIR = os.path.expanduser('~/santana')
+BASE_DIR = get_base_dir()
 ENV_PATH = os.path.join(BASE_DIR, '.env')
 
 # ── PID LOCK : empêche les doubles processus (Correctif 1) ──
@@ -26,7 +26,7 @@ _RATE_WINDOW = 2.0
 # ── Boot time pour /status ──
 _BOOT_TIME = __import__('time').time()
 
-from core.utils import load_env, TokenFilter
+from core.utils import load_env, TokenFilter, get_base_dir
 load_env(ENV_PATH)
 print(f"[SANTANA BOOT] DEEPSEEK_MODEL='{os.getenv('DEEPSEEK_MODEL', 'NOT_LOADED')}'", flush=True)
 

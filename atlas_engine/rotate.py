@@ -8,8 +8,9 @@ Rotation mensuelle automatique pour la mémoire Santana.
 """
 import os, re, logging, shutil
 from datetime import datetime
+from core.utils import get_base_dir
 
-BASE_DIR = os.path.expanduser("~/santana/memory")
+BASE_DIR = os.path.join(get_base_dir(), "memory")
 
 logger = logging.getLogger(__name__)
 

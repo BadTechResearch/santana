@@ -49,7 +49,7 @@ Ma solution :
 2. Résumés compressés de l'historique
 3. Embeddings vectoriels SQLite (all-MiniLM-L6-v2, 80MB, CPU)
 
-L'agent se souvient de ce que tu lui as dit il y a 3 jours, sur Telegram ou Discord, même après redémarrage.
+L'agent se souvient de ce que tu lui as dit il y a 3 jours, sur Telegram, même après redémarrage.
 
 **Tweet 6/7 — Outils et autonomie**
 15+ outils intégrés :

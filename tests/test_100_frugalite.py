@@ -56,7 +56,7 @@ _IMPORT_NAME_OVERRIDES = {
     "python-telegram-bot": "telegram", "python-dotenv": "dotenv",
     "google-api-python-client": "googleapiclient", "deep-translator": "deep_translator",
     "edge-tts": "edge_tts", "fake-useragent": "fake_useragent",
-    "faster-whisper": "faster_whisper", "gitpython": "git", "markdown": "markdown",
+    "gitpython": "git", "markdown": "markdown",
     "pymupdf": "fitz", "pyjwt": "jwt", "scikit-learn": "sklearn",
     "sentence-transformers": "sentence_transformers", "pydantic-settings": "pydantic_settings",
     "python-multipart": "multipart", "requests-oauthlib": "requests_oauthlib",

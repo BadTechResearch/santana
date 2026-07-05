@@ -9,10 +9,11 @@ import json
 import logging
 import os
 import time
+from core.utils import get_base_dir
 
 logger = logging.getLogger(__name__)
 
-_CACHE_DIR = os.path.expanduser("~/santana/.cache")
+_CACHE_DIR = os.path.join(get_base_dir(), ".cache")
 _CACHE_TTL = 300  # 5 minutes
 os.makedirs(_CACHE_DIR, exist_ok=True)
 

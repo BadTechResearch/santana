@@ -1,8 +1,25 @@
-"""Utilitaires partagés : strip_dsml, load_env, TokenFilter."""
+"""Utilitaires partagés : strip_dsml, load_env, TokenFilter, get_base_dir."""
 
 import os
 import re
 import logging
+
+
+SANTANA_HOME_ENV = "SANTANA_HOME"
+
+
+def get_base_dir() -> str:
+    """Retourne le répertoire racine de Santana.
+
+    Priorité :
+    1. Variable d'environnement SANTANA_HOME (portable, override)
+    2. ~/santana (défaut historique)
+
+    Tous les modules devraient utiliser cette fonction plutôt que
+    hardcoder os.path.expanduser("~/santana") — permet de déplacer
+    l'installation sans casser 27 fichiers.
+    """
+    return os.environ.get(SANTANA_HOME_ENV, os.path.expanduser("~/santana"))
 
 
 def load_env(path):

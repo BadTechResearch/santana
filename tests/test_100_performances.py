@@ -42,7 +42,7 @@ def test_cost_reset_on_reset():
 def test_no_blocking_load():
     """Aucun import lourd (torch/sentence_transformers/playwright) au niveau module
     de santana.py ou core/react_loop.py — doit rester lazy (chargé à l'usage)."""
-    heavy = ("sentence_transformers", "torch", "playwright", "faster_whisper")
+    heavy = ("sentence_transformers", "torch", "playwright")
     for relpath in ("santana.py", os.path.join("core", "react_loop.py")):
         path = os.path.join(BASE_DIR, relpath)
         with open(path) as f:

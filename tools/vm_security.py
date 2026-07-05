@@ -36,6 +36,9 @@ VM_EXEC_ALLOWLIST = frozenset({
     "cat", "head", "tail", "less",
     "git", "pytest", "systemctl", "journalctl",
     "rm",
+    "curl", "wget", "ping",
+    "python3", "python",
+    "apt", "apt-get", "dpkg",
 })
 
 # Binaires qui, meme allowlistes, ne doivent jamais recevoir certains flags

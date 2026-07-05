@@ -1,6 +1,7 @@
 import os, json, logging
 import sys
-sys.path.insert(0, os.path.expanduser("~/santana"))
+from core.utils import get_base_dir
+sys.path.insert(0, get_base_dir())
 
 def detect_livre(text: str) -> str:
     text = text.lower()

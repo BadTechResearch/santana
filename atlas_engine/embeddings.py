@@ -7,8 +7,9 @@ Recherche sémantique réelle — pas juste TF-IDF.
 import os, json, re, time, logging, functools
 import numpy as np
 from numpy.linalg import norm
+from core.utils import get_base_dir
 
-BASE_DIR = os.path.expanduser("~/santana")
+BASE_DIR = get_base_dir()
 LIVRES_DIR = os.path.join(BASE_DIR, "memory", "livres")
 INDEX_PATH = os.path.join(BASE_DIR, "memory", "livres_index.json")
 EMBED_PATH = os.path.join(BASE_DIR, "memory", "livres_embeddings.npy")
