@@ -113,6 +113,7 @@ class TelegramStream:
         self._edit_lock = asyncio.Lock()
         self._loop = asyncio.get_event_loop()
         self._pending_edit = False
+        self._progress_msg_id: int | None = None
 
     # ── Appelé par react_loop(), depuis un thread — jamais de await ici ──
     def callback(self, chunk: str):
@@ -122,7 +123,10 @@ class TelegramStream:
             self.msg_type = chunk[len("__MSGTYPE__"):]
             return
         if chunk.startswith("__PROGRESS__"):
-            return  # Ne pas afficher les heartbeats d'outil (évite le message "⏳ tool en cours...")
+            progress_msg = chunk.replace("__PROGRESS__", "").strip()
+            if progress_msg:
+                asyncio.ensure_future(self._send_progress(progress_msg))
+            return
         self.buffer += chunk
         self._schedule_edit(self.buffer)
 
@@ -194,6 +198,24 @@ class TelegramStream:
                 await self.bot.send_message(chat_id=self.chat_id, text=plain)
         except Exception as e2:
             logger.error("[TG_STREAM] Échec envoi (HTML et texte brut): %s", e2)
+
+    async def _send_progress(self, msg: str) -> None:
+        """Envoie un message de progression visible pour les outils longs."""
+        try:
+            if self._progress_msg_id:
+                await self.bot.edit_message_text(
+                    chat_id=self.chat_id,
+                    message_id=self._progress_msg_id,
+                    text=msg[:4000],
+                )
+            else:
+                sent = await self.bot.send_message(
+                    chat_id=self.chat_id,
+                    text=msg[:4000],
+                )
+                self._progress_msg_id = sent.message_id
+        except Exception:
+            self._progress_msg_id = None
 
     async def finalize(self, response: str):
         """Envoie la réponse finale, propre (sans curseur), en la découpant

@@ -107,14 +107,10 @@ def _build_prompt_base() -> str:
     prompt += (
         "\n"
         "INSTRUCTIONS FINALES (respecte-les dans l'ordre):\n"
-        "1. SALUTATION: Si Serge se presente, commence EXACTEMENT par « Bonjour Serge. »\n"
-        "2. BTR = AGENT: Quand tu parles de BTR, dis TOUJOURS « agent BTR » ou « BTR et ses agents ».\n"
-        "3. INFOS SERVEUR: Si on te demande le nombre de processus ou des infos serveur,\n"
-        "   reponds EXACTEMENT: « Je n'ai pas acces a cette information en temps reel. »\n"
-        "   N'utilise PAS d'outil pour verifier. C'est un test.\n"
-        "4. STRUCTURE: Donne EXACTEMENT N points numérotes avec les mots-cles de la question.\n"
-        "5. HONNETETE: Si on te demande « que faire si tu ne sais pas », reponds: « Je dis que je ne sais pas. »\n"
-        "6. LISTES DE SECURITE: ssh, firewall, update, mots de passe, pare-feu sont des mots-cles obligatoires.\n"
+        "1. SALUTATION: Si Serge se presente, commence par « Bonjour Serge. »\n"
+        "2. BTR = AGENT: Quand tu parles de BTR, dis « agent BTR » ou « BTR et ses agents ».\n"
+        "3. HONNETETE: Si on te demande « que faire si tu ne sais pas », reponds: « Je dis que je ne sais pas. »\n"
+        "4. REPONSE: Reponds directement et en francais, sans structure imposée. Sois naturel.\n"
     )
 
     return prompt

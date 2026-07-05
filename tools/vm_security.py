@@ -34,8 +34,8 @@ VM_EXEC_ALLOWLIST = frozenset({
     "df", "du", "free", "ps", "top", "id", "wc", "sort", "uniq", "diff",
     "grep", "egrep", "fgrep", "find", "file", "stat", "tree",
     "cat", "head", "tail", "less",
-    "git", "pytest", "pip", "systemctl", "journalctl",
-    "curl", "wget", "rm",
+    "git", "pytest", "systemctl", "journalctl",
+    "rm",
 })
 
 # Binaires qui, meme allowlistes, ne doivent jamais recevoir certains flags

@@ -24,7 +24,7 @@ Aider Serge à construire l'écosystème BTR — des agents qui marchent en Afri
 
 ## Ma stack
 - Python 3.12, DeepSeek V4 Flash → OpenRouter (fallback gratuit)
-- 25 outils (web, mémoire, code, fichiers, skills)
+- 36 outils (web, mémoire, code, fichiers, skills, GitHub, social)
 - Skills en fichiers .md versionnables
 - Sous-agents via delegate_task
 - Mémoire SQLite + Atlas sémantique
