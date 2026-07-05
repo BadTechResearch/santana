@@ -198,6 +198,7 @@ def test_deepseek_model_single_source_of_truth():
     vs 'deepseek-v4-flash' pouvaient diverger silencieusement).
     """
     from deepseek_client import DEEPSEEK_MODEL
+    pytest.importorskip("tg_handlers.state", reason="tg_handlers/ non présent dans le dépôt public")
     from tg_handlers.state import DISPLAY_MODEL
 
     assert DISPLAY_MODEL == DEEPSEEK_MODEL
@@ -218,7 +219,7 @@ def test_cost_governor_single_budget_source():
     # tests/ exclu : ce fichier de test mentionne lui-même la chaîne "DEEPSEEK_COST_LIMIT"
     # dans ses docstrings/assertions, ce qui produirait un faux positif auto-référentiel.
     for root, dirs, files in os.walk(BASE_DIR):
-        dirs[:] = [d for d in dirs if d not in ("venv_new", ".git", "__pycache__", "tests")]
+        dirs[:] = [d for d in dirs if d not in ("venv_new", ".git", "__pycache__", "tests", "backup")]
         for fname in files:
             if not fname.endswith(".py"):
                 continue
@@ -316,6 +317,7 @@ def test_bug_a_is_allowed_fails_closed():
     GROUP_BLACK_INTELLIGENCE n'est pas configuré (GROUP_ID=0). Avant le fix,
     `or GROUP_ID == 0` ouvrait l'accès à TOUT LE MONDE dans ce cas.
     """
+    pytest.importorskip("tg_handlers.state", reason="tg_handlers/ non présent dans le dépôt public")
     import tg_handlers.state as state
     original = (state.CHAT_ID, state.GROUP_ID)
     try:
@@ -397,6 +399,7 @@ def test_bug_3_auth_uses_constant_time_comparison():
     """Bug 3 (audit 3) : auth() doit utiliser hmac.compare_digest(), pas ==,
     pour éviter une timing attack sur la comparaison du token API.
     """
+    pytest.importorskip("routes.common", reason="routes/ non présent dans le dépôt public")
     from routes.common import auth, TOKEN
 
     source = inspect.getsource(auth)
@@ -422,7 +425,8 @@ def test_bug_imports_casses_santana_py():
     noms importés, sans exécuter santana.py — voir docstring du fichier).
     """
     assert "newsession_command" not in open(os.path.join(BASE_DIR, "santana.py")).read()
-    assert "codex_command" not in open(os.path.join(BASE_DIR, "tg_handlers", "media.py")).read()
+    if os.path.exists(os.path.join(BASE_DIR, "tg_handlers", "media.py")):
+        assert "codex_command" not in open(os.path.join(BASE_DIR, "tg_handlers", "media.py")).read()
 
 
 def test_bug_evaluator_log_evaluation_called_from_react_loop():

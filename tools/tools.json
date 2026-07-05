@@ -568,5 +568,158 @@
         "required": ["path"]
       }
     }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "instagram_search",
+      "description": "Cherche des posts Instagram par mot-cle via Xpoz SDK (12 credits/req). Retourne caption, likes, commentaires, images. Pour la RDC ou tout sujet d'actualite visuelle.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Termes de recherche"},
+          "max_posts": {"type": "integer", "description": "Maximum de posts (defaut: 10, max: 20)"}
+        },
+        "required": ["query"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "tiktok_search",
+      "description": "Cherche des videos TikTok par mot-cle via Xpoz SDK (5 credits/req). Retourne description, likes, plays, hashtags. Pour les tendances, contenus viraux, actualites.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Termes de recherche"},
+          "max_posts": {"type": "integer", "description": "Maximum de videos (defaut: 10, max: 20)"}
+        },
+        "required": ["query"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "twitter_lookup",
+      "description": "Cherche les tweets recents d'un compte Twitter/X specifique. Alternative a twitter_search quand on connait le nom du compte (@handle).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "handle": {"type": "string", "description": "Nom du compte Twitter sans @ (ex: PresidenceRDC)"},
+          "query": {"type": "string", "description": "Filtre optionnel dans les tweets du compte"},
+          "max_tweets": {"type": "integer", "description": "Maximum de tweets (defaut: 5, max: 50)"}
+        },
+        "required": ["handle"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "reddit_lookup",
+      "description": "Regarde les posts recents d'un subreddit specifique. Ex: reddit_lookup subreddit='RDC', max_posts=10",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "subreddit": {"type": "string", "description": "Nom du subreddit (sans r/)"},
+          "max_posts": {"type": "integer", "description": "Maximum de posts (defaut: 5, max: 50)"}
+        },
+        "required": ["subreddit"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "instagram_lookup",
+      "description": "Regarde les posts publics recents d'un compte Instagram. Attention: 12 credits/req Xpoz.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "username": {"type": "string", "description": "Nom d'utilisateur Instagram"},
+          "max_posts": {"type": "integer", "description": "Maximum de posts (defaut: 5, max: 20)"}
+        },
+        "required": ["username"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "tiktok_lookup",
+      "description": "Regarde les videos recents d'un compte TikTok specifique.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "username": {"type": "string", "description": "Nom d'utilisateur TikTok"},
+          "max_posts": {"type": "integer", "description": "Maximum de videos (defaut: 5, max: 20)"}
+        },
+        "required": ["username"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "twitter_search",
+      "description": "Cherche des tweets recents par mot-cle via Xpoz SDK (fallback DuckDuckGo).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query_search": {"type": "string", "description": "Termes de recherche"},
+          "max_tweets": {"type": "integer", "description": "Maximum de tweets (defaut: 10, max: 50)"}
+        },
+        "required": ["query_search"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "reddit_search",
+      "description": "Cherche des posts Reddit par mot-cle via Xpoz SDK (fallback DuckDuckGo).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Termes de recherche"},
+          "subreddit": {"type": "string", "description": "Sous-reddit specifique (optionnel)"},
+          "max_posts": {"type": "integer", "description": "Maximum de posts (defaut: 10, max: 50)"}
+        },
+        "required": ["query"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "social_news",
+      "description": "Cherche des actualites recentes sur les reseaux sociaux via Google News RSS.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {"type": "string", "description": "Sujet de recherche"},
+          "platform": {"type": "string", "enum": ["all", "twitter", "reddit"], "description": "Plateforme (defaut: all)"},
+          "max_results": {"type": "integer", "description": "Maximum (defaut: 8, max: 15)"}
+        },
+        "required": ["query"]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "social_browser",
+      "description": "Ouvre une URL sociale specifique avec Playwright. Usage reserve aux URLs fournies explicitement par l'utilisateur.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "url": {"type": "string", "description": "URL complete a ouvrir"},
+          "timeout": {"type": "integer", "description": "Timeout en secondes (defaut: 20, max: 30)"}
+        },
+        "required": ["url"]
+      }
+    }
   }
 ]
