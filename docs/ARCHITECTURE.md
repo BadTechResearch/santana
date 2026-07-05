@@ -206,8 +206,8 @@ Message entrant (Telegram / Discord / API)
 | Plateforme | Technologie | État |
 |------------|-------------|------|
 | **Telegram** | python-telegram-bot | ✅ Production |
-| **Discord** | discord.py | ✅ Production |
-| **API REST** | Flask | ✅ Production |
+| **Discord** | discord.py | 🔧 Planifié (non implémenté) |
+| **API REST** | Flask | 🔧 Planifié (non implémenté) |
 
 ## Sécurité
 

@@ -4,7 +4,7 @@
 
 ---
 
-Santana is a production-ready autonomous AI agent with persistent memory, web search, GitHub integration, code execution, and multi-platform delivery (Telegram, Discord, REST API).
+Santana is a production-ready autonomous AI agent with persistent memory, web search, GitHub integration, and code execution on Telegram.
 
 The headline number: it runs on a **GCP e2-micro** (2 vCPUs, 2GB RAM, ~$7/mo) and costs **<$10/mo in LLM inference** — ~$17/mo total.
 
