@@ -17,14 +17,20 @@
   </a>
   <img src="https://img.shields.io/badge/Cost-%3C%2417%2Fmo-2dd4bf?style=flat" alt="Cost">
   <img src="https://img.shields.io/badge/Infra-No%20Docker%20%E2%9C%93-2dd4bf?style=flat" alt="No Docker">
+  <a href="https://github.com/BadTechResearch/santana/actions/workflows/test.yml">
+    <img src="https://img.shields.io/github/actions/workflow/status/BadTechResearch/santana/test.yml?style=flat&label=CI&color=22c55e" alt="CI">
+  </a>
+  <img src="https://img.shields.io/badge/Coverage-30%25-22c55e?style=flat" alt="Coverage">
 </p>
 
 <p align="center">
-  <b>Santana</b> — an autonomous AI agent that remembers, learns, and improves itself.<br>
+  <b>Santana</b> — the AI agent that works in Africa.<br>
+  No GPU. No fiber. No credit card required.<br>
   🚀 Runs on a <b>$7/mo VM</b> · 💰 <b>&lt;$10/mo</b> in LLM inference · 🗄️ <b>Zero Docker/Redis/Postgres</b>
 </p>
 
 <p align="center">
+  <a href="#-philosophy"><b>Philosophy</b></a> ·
   <a href="#-quick-start"><b>Quick Start</b></a> ·
   <a href="docs/ARCHITECTURE.md"><b>Architecture</b></a> ·
   <a href="CHANGELOG.md"><b>Changelog</b></a> ·
@@ -37,7 +43,43 @@
 <!-- GitHub social preview — set this as repo social preview image in Settings > Options > Social preview -->
 <!-- <meta property="og:image" content="docs/assets/og-image.png"> -->
 
-Built entirely in Python by **Serge**.
+Built entirely in Python by **Serge** — part of the [BadTechResearch](https://github.com/BadTechResearch) ecosystem.
+
+> **BadTechResearch mission:** Build autonomous AI infrastructure that works without Silicon Valley prerequisites — no GPU cluster, no fiber backbone, no $200/mo API bill. Santana is the first agent designed to run in the Global South, for the Global South.
+
+---
+
+## 🧭 Philosophy
+
+### Why Santana exists
+
+Most AI agents are designed for data centers. They assume:
+- 🖥️ Unlimited GPU compute (CrewAI, AutoGPT)
+- 🌐 High-bandwidth fiber (LangChain, ChromaDB)
+- 💳 A US$200+/month API budget (Claude Pro, GPT-4)
+
+**Santana flips every assumption.**
+
+It's built for the constraints of African developers, indie hackers, and anyone who's tired of the container tax:
+
+- **No Docker** → single `python santana.py`
+- **No Redis** → SQLite WAL mode (faster than Redis for single-node, no ops)
+- **No Postgres** → everything in one file
+- **No GPU** → all-MiniLM-L6-v2 on CPU (80 MB, runs anywhere)
+- **No fiber** → DeepSeek V4 Flash via REST API (works on a 3G hotspot)
+- **No credit card needed** → ~$17/month total (VM + inference)
+
+### Cost transparency
+
+| Item | Cost | Notes |
+|------|------|-------|
+| VM (Hetnzer CX11, 2 GB RAM) | $3.79/mo | Or Oracle Cloud free tier |
+| DeepSeek API (typical use) | $2-8/mo | ~30K prompts/month |
+| **Total** | **$6-12/mo** | Less than a streaming subscription |
+
+### Why AGPL-3.0
+
+AGPL isn't just a license — it's a commitment. If you build a business on Santana, your improvements stay open. In an ecosystem where Big Tech extracts from open-source, AGPL ensures the Global South keeps what the Global South builds.
 
 ---
 
@@ -49,7 +91,7 @@ Built entirely in Python by **Serge**.
 | 💾 **3-Layer Memory** | Session buffer + summaries + SQLite vector embeddings (all-MiniLM-L6-v2) |
 | 🌐 **Web Search** | Real-time Google/Social search via Serper API |
 | 🐙 **GitHub Integration** | Read/write repos, manage files, check rate limits |
-| 🛠️ **Tool System** | 15+ extensible tools: code execution, terminal, MCP, web, social, YouTube |
+|| 🛠️ **Tool System** | 36 tools: code execution, terminal, MCP, web, social search, YouTube, GitHub, skills, PDF, browser |
 | 💰 **Cost Governor** | Budget-aware LLM calls with ALERT/THROTTLE/STOP thresholds |
 | 🔄 **Self-Awareness** | Dynamic self-model analysis via `self.py` — knows its own code, tools, and prompt |
 | 🔒 **Secure VM** | Whitelist-based command execution, restricted terminal, .env protection |
@@ -159,6 +201,20 @@ python santana.py
 **GNU Affero General Public License v3.0 (AGPL-3.0)**
 
 This license ensures Santana remains free and open — any modified version deployed as a service must also be open source.
+
+---
+
+## 🗺️ Roadmap
+
+| Horizon | Focus | Details |
+|---------|-------|---------|
+| **Q3 2026** | Community | First external contributions, issue templates, CI badges |
+| **Q3 2026** | Stability | MongoDB → SQLite migration complete, 50%+ test coverage |
+| **Q4 2026** | Tools | Plugin system, tool marketplace, community tool registry |
+| **Q4 2026** | Performance | Streaming responses, parallel tool execution, latency <2s |
+| **2027** | Autonomy | Full autonomous mode: Santana initiates conversations, schedules tasks, learns user preferences over months |
+
+*Roadmap is a living document — open an issue to suggest priorities.*
 
 ---
 

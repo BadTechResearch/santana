@@ -1,0 +1,76 @@
+name: Bug report
+description: Something isn't working as expected
+title: "[Bug] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! Please check [existing issues](https://github.com/BadTechResearch/santana/issues) first.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: Describe the bug
+      description: What happened? What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce this issue?
+      placeholder: |
+        1. Clone the repo
+        2. Run `python santana.py --setup`
+        3. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs or output
+      description: Paste any error messages, stack traces, or screenshots.
+      render: shell
+
+  - type: input
+    id: version
+    attributes:
+      label: Santana version
+      description: What version are you running? (from `git describe --tags` or CHANGELOG)
+      placeholder: "v2.0.0"
+
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Environment
+      options:
+        - VM / VPS (specify in notes)
+        - Local machine
+        - Raspberry Pi / ARM
+        - Docker (unsupported, but tell us)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Configuration (sanitized)
+      description: Paste your `.env` file **without secrets** (remove API keys and tokens)
+      placeholder: |
+        DEEPSEEK_MODEL=deepseek-v4-flash
+        DEEPSEEK_COST_LIMIT=0.10
+        ...
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Checklist
+      options:
+        - label: I have checked that this bug is not already reported
+          required: true
+        - label: I have removed all API keys and secrets from logs/config
+          required: true

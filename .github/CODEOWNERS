@@ -1,0 +1,23 @@
+# `.github/CODEOWNERS` — automatic review requests
+# Each line is a file pattern followed by one or more owners.
+# More info: https://docs.github.com/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+* @BadTechResearch
+
+# Core agent logic
+/agent/ @BadTechResearch
+/core/ @BadTechResearch
+
+# Tools
+/tools/ @BadTechResearch
+
+# Tests — any change needs review
+/tests/ @BadTechResearch
+
+# Documentation
+/docs/ @BadTechResearch
+*.md @BadTechResearch
+
+# CI/CD
+/.github/ @BadTechResearch
