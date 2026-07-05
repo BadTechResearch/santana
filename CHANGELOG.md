@@ -15,7 +15,7 @@
 - **🔄 Auto-analyse dynamique** (`self.py`) — l'agent connaît son propre code, ses outils et son prompt
 - **🔒 Sécurité** : whitelist de commandes, terminal restreint, protection `.env`
 - **📡 Multi-plateforme** : Telegram, Discord, API REST — boucle agent unifiée
-- **🧪 Suite de tests** : 97% de couverture (tests unitaires + test_system_integrity.py)
+- **🧪 Suite de tests** : suite complète de tests unitaires + test_system_integrity.py
 
 ### 🛠️ Infrastructure
 
