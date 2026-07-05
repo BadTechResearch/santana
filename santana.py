@@ -328,7 +328,7 @@ if __name__ == '__main__':
         logging.warning(f'[SANTANA] Rotation mensuelle: {e}')
 
     # ── Watchdog + Guardian (autonomie réelle, voir tools/guardian.py) ──
-    from tools.guardian import start_guardian, start_watchdog
+    from tools.guardian import start_watchdog
 
     _background_tasks = []
 
@@ -372,7 +372,6 @@ if __name__ == '__main__':
         _background_tasks.append(asyncio.create_task(_watchdog_ping()))
         _background_tasks.append(asyncio.create_task(_warmup_embeddings()))
         _background_tasks.append(asyncio.create_task(start_watchdog(_WD_CTX)))
-        _background_tasks.append(asyncio.create_task(start_guardian()))
 
     async def _post_stop(app):
         for task in _background_tasks:

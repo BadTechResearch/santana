@@ -377,16 +377,4 @@ def build_system_prompt(user_message: str = "", msg_type: str = None) -> str:
         except Exception as e:
             logging.error("[MEMORY] Conflict detector fallback: %s", e)
 
-    # Suggestion proactive (Phase 2 — Réveil) — skip pour SOCIAL
-    if message_type not in ("SOCIAL",) and not _degraded and user_message:
-        try:
-            from agent.proactive import can_suggest, build_suggestion
-            ok, reason = can_suggest()
-            if ok:
-                suggestion = build_suggestion("conversation", {"sujet": user_message[:60]})
-                if suggestion and suggestion.get("suggestion"):
-                    prompt += f"\n💡 SUGGESTION : {suggestion['suggestion'][:300]}\n"
-        except Exception as _pe:
-            logging.debug("[PROACTIVE] Suggestion injection skip: %s", _pe)
-
     return prompt

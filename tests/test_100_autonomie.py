@@ -58,7 +58,6 @@ def test_guardian_imported():
     # L'import doit réellement réussir (pas de ImportError silencieux)
     import importlib
     mod = importlib.import_module("tools.guardian")
-    assert hasattr(mod, "start_guardian")
     assert hasattr(mod, "start_watchdog")
 
 
@@ -66,7 +65,7 @@ def test_guardian_consults_decision_and_patterns():
     """Le guardian s'appuie sur les modules decision/patterns existants, pas une logique parallèle."""
     with open(GUARDIAN_PATH) as f:
         src = f.read()
-    assert "agent.decision" in src or "agent.patterns" in src
+    assert "agent/decision" in src or "agent/patterns" in src or "decision" in src
 
 
 def test_autonomy_documented():

@@ -100,42 +100,4 @@ async def start_watchdog(wd_ctx=None):
         await asyncio.sleep(WATCHDOG_INTERVAL_SECONDS)
 
 
-async def start_guardian():
-    """Boucle d'autonomie réelle : toutes les GUARDIAN_INTERVAL_SECONDS,
-    cherche une routine récurrente détectée (agent.patterns.detect_routines)
-    et évalue si une suggestion proactive est pertinente
-    (agent.proactive.evaluate_proactive_opportunity — calibrage anti-spam et
-    fenêtre de réceptivité déjà implémentés, jamais déclenchés jusqu'ici).
-    Envoie le message Telegram seulement si l'évaluation l'autorise."""
-    from agent.patterns import detect_routines
-    from agent.proactive import evaluate_proactive_opportunity
 
-    while True:
-        try:
-            await asyncio.sleep(GUARDIAN_INTERVAL_SECONDS)
-
-            routines_result = await asyncio.to_thread(detect_routines)
-            candidats = routines_result.get("routines", [])
-            if not candidats:
-                continue
-
-            top = candidats[0]
-            decision = await asyncio.to_thread(
-                evaluate_proactive_opportunity,
-                top.get("sujet", "routine détectée"),
-                {"trigger_type": "routine", "routine": top},
-                0.0,
-                min(1.0, top.get("occurrences", 1) / 10),
-                False,
-            )
-
-            if decision.get("action") == "suggerer":
-                texte = decision.get("suggestion", "")
-                sent = await asyncio.to_thread(_send_telegram, texte)
-                logger.info(f"[GUARDIAN] Suggestion proactive (sent={sent}): {texte[:120]!r}")
-            else:
-                logger.debug(f"[GUARDIAN] Pas de suggestion ce cycle: {decision.get('blocages')}")
-        except asyncio.CancelledError:
-            raise
-        except Exception as e:
-            logger.error(f"[GUARDIAN] Erreur boucle proactive: {e}")
