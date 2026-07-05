@@ -28,10 +28,14 @@
   <a href="#-quick-start"><b>Quick Start</b></a> ·
   <a href="docs/ARCHITECTURE.md"><b>Architecture</b></a> ·
   <a href="CHANGELOG.md"><b>Changelog</b></a> ·
+  <a href="#-screenshots"><b>Screenshots</b></a> ·
   <a href="CONTRIBUTING.md"><b>Contributing</b></a>
 </p>
 
 ---
+
+<!-- GitHub social preview — set this as repo social preview image in Settings > Options > Social preview -->
+<!-- <meta property="og:image" content="docs/assets/og-image.png"> -->
 
 Built entirely in Python by **Serge**.
 
@@ -51,6 +55,22 @@ Built entirely in Python by **Serge**.
 | 🔒 **Secure VM** | Whitelist-based command execution, restricted terminal, .env protection |
 | 📡 **Multi-Platform** | Telegram, Discord, and REST API — unified agent loop |
 | 🧪 **Test Suite** | Reference test suite (`test_system_integrity.py` + unit tests) |
+
+---
+
+## 📸 Screenshots
+
+<p align="center">
+  <img src="docs/assets/og-image.png" alt="Santana — Social Preview" width="90%">
+  <br>
+  <sub><i>Social preview / OG image — set this as your repo social preview in Settings → Options</i></sub>
+</p>
+
+<p align="center">
+  <img src="docs/assets/screenshot.png" alt="Santana — Terminal &amp; Chat UI" width="90%">
+  <br>
+  <sub><i>Terminal dashboard &amp; Telegram chat interface</i></sub>
+</p>
 
 ---
 
