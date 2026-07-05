@@ -296,9 +296,8 @@ def _generate_suggestion_text(trigger: str, contexte: dict) -> str:
         return f"J'ai enregistré votre préférence *{cle}* = *{valeur}*. Je m'y adapterai."
 
     else:
-        # Suggestion générique : BLOQUÉE — 10 suggestions identiques dans l'historique
-        # (audit Fable 5, 05/07). Un silence vaut mieux que du bruit inutile.
-        return ""  # chaîne vide = ne rien envoyer
+        # Suggestion générique
+        return f"Suite à « {trigger[:80]} », je peux vous aider si besoin."
 
 
 def _record_suggestion(sujet: str, urgence_score: float, escalade_level: int, suggestion: str) -> None:
@@ -379,9 +378,6 @@ def evaluate_proactive_opportunity(
     # Étape 4 : Décision
     if can_sug and is_good:
         result = build_suggestion(trigger, contexte)
-        # Bloquer les suggestions vides/génériques (audit Fable 5)
-        if not result.get("suggestion", "").strip():
-            return {"action": "ignorer", "blocages": ["suggestion vide/générique"]}
         result["calibrage_ok"] = True
         result["calibrage_raison"] = calib_reason
         result["timing_ok"] = True

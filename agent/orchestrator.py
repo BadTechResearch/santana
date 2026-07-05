@@ -149,7 +149,7 @@ def invalidate_prompt_cache():
 
 # ─── Messages sociaux (pas de mémoire nécessaire) ──────────────────────────────
 _QUERIES_COURTES = {"bonjour", "salut", "coucou", "hey", "hello", "hi", "yo",
-                    "merci", "ok", "d'accord", "oui", "non", "👍", "✅",
+                    "merci", "ok", "d'accord", "oui", "non", "👍", "✅", "bien",
                     "cc", "re", "hmm", "dac", "okay", "bye", "au revoir", "super",
                     "parfait", "cool", "nice", "lol", "mdr", "ptdr", "thanks"}
 
@@ -171,10 +171,9 @@ def classify_message(text: str) -> str:
 
     # Messages sociaux
     social_patterns = [
-        # Note: "bien" retire volontairement — trop générique (matche "comBien", "bienvennue", etc.)
         "salut", "bonjour", "bonsoir", "hello", "hi ",
         "ça va", "ca va", "comment tu vas", "comment vas",
-        "merci", "ok", "okay", "super", "parfait",
+        "merci", "ok", "okay", "super", "bien", "parfait",
         "oui", "non", "ouais", "nope", "yes", "no",
         "bye", "au revoir", "bonne nuit", "à plus"
     ]
