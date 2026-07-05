@@ -235,6 +235,10 @@ def build_suggestion(trigger: str, contexte: dict | None = None) -> dict:
 
     # Générer la suggestion selon le type de trigger
     suggestion_text = _generate_suggestion_text(trigger, contexte)
+    # Si la suggestion est vide/generique, abandonner (audit Fable 5)
+    if not suggestion_text.strip():
+        return {"suggestion": "", "niveau_escalade": 0, "sujet": sujet,
+                "importance": 0, "blocages": ["suggestion vide"]}
 
     prefix = prefix_map.get(level, "💡 *Suggestion* :")
 
@@ -265,6 +269,9 @@ def _generate_suggestion_text(trigger: str, contexte: dict) -> str:
     if trigger_type == "routine":
         routine_info = contexte.get("routine", {})
         sujet = routine_info.get("sujet", trigger[:60])
+        # Bloquer les sujets generiques (audit Fable 5)
+        if not sujet or sujet.strip().lower() in ("conversation", "routine", "general", "default", "", "routine détectée", "routine detectee"):
+            return ""
         heure = routine_info.get("heure", "cette heure")
         return f"J'ai remarqué que vous travaillez souvent sur *{sujet}* à {heure}. Voulez-vous que je prépare quelque chose ?"
 
