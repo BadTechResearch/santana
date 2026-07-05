@@ -48,9 +48,7 @@ _quarantined_until: dict[str, float] = {}  # tool_name -> expiry timestamp
 def reset_state():
     """Réinitialise l'état global de react_loop (quarantaine + cache prompt)."""
     _quarantined_until.clear()
-    _CACHED_PROMPT["system"] = ""
-    _CACHED_PROMPT["msg_type"] = ""
-    _CACHED_PROMPT["time"] = 0.0
+    # Cache prompt supprimé (v1.1) — plus de _CACHED_PROMPT global
     cache_purge_all()
 
 
@@ -173,8 +171,9 @@ _TOOLS_BY_TYPE = {
     "SOCIAL": [],
 }
 
-# Cache du prompt système : 26K chars reconstruits à chaque message sinon
-_CACHED_PROMPT = {"system": "", "msg_type": "", "time": 0.0}
+# Cache prompt supprimé (v1.1) : build_system_prompt reconstruit
+# le prompt complet à chaque message. Le cache partiel du socle
+# statique est dans orchestrator.py::get_prompt_base().
 
 
 def _filter_tools(msg_type: str, full_tools: list) -> list:
@@ -343,18 +342,11 @@ async def react_loop(user_message: str,
     # Type de message (nécessaire AVANT build_system_prompt pour le cache)
     msg_type = classify_message(user_message)
 
-    # ── Cache prompt système : ne pas reconstruire 26K à chaque message ──
-    now = time.time()
-    if (msg_type == _CACHED_PROMPT["msg_type"]
-            and now - _CACHED_PROMPT["time"] < 300.0
-            and _CACHED_PROMPT["system"]):
-        SYSTEM = _CACHED_PROMPT["system"]
-        logging.info(f"[CACHE] Prompt système réutilisé ({len(SYSTEM)} chars)")
-    else:
-        SYSTEM = build_system_prompt(user_message=user_message, msg_type=msg_type)
-        _CACHED_PROMPT["system"] = SYSTEM
-        _CACHED_PROMPT["msg_type"] = msg_type
-        _CACHED_PROMPT["time"] = now
+    # Prompt système : build_system_prompt gère elle-même son cache
+    # (get_prompt_base() dans orchestrator.py — socle statique uniquement,
+    # pas la mémoire dynamique). Un cache supplémentaire ici gèlerait
+    # la mémoire 5 minutes (cf. audit Fable 5).
+    SYSTEM = build_system_prompt(user_message=user_message, msg_type=msg_type)
     messages = [{"role": "system", "content": SYSTEM}]
 
     # Contexte récent : uniquement si build_system_prompt() n'a pas déjà
