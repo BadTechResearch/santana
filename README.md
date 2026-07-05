@@ -1,8 +1,37 @@
-# 🎸 Santana — Autonomous AI Agent
+<p align="center">
+  <img src="docs/hero-banner.svg" alt="Santana — Autonomous AI Agent" width="100%">
+</p>
 
-> *"An agent that remembers, learns, and improves itself."*
+<p align="center">
+  <a href="https://github.com/BadTechResearch/santana/releases/tag/v2.0.0">
+    <img src="https://img.shields.io/github/v/release/BadTechResearch/santana?style=flat&label=Release&color=7c3aed" alt="Release">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/License-AGPL--3.0-7c3aed?style=flat" alt="License">
+  </a>
+  <a href="https://github.com/BadTechResearch/santana">
+    <img src="https://img.shields.io/github/stars/BadTechResearch/santana?style=flat&label=Stars&color=06b6d4" alt="Stars">
+  </a>
+  <a href="docs/ARCHITECTURE.md">
+    <img src="https://img.shields.io/badge/Docs-ARCHITECTURE-06b6d4?style=flat" alt="Architecture">
+  </a>
+  <img src="https://img.shields.io/badge/Cost-%3C%2417%2Fmo-2dd4bf?style=flat" alt="Cost">
+  <img src="https://img.shields.io/badge/Infra-No%20Docker%20%E2%9C%93-2dd4bf?style=flat" alt="No Docker">
+</p>
 
-**Santana** is a production-ready autonomous AI agent built on the **Hermes Agent** framework. It maintains persistent memory, searches the web and social platforms, manages GitHub repositories, executes sandboxed code, interacts across Telegram/Discord/API, and continuously monitors its own costs.
+<p align="center">
+  <b>Santana</b> — an autonomous AI agent that remembers, learns, and improves itself.<br>
+  🚀 Runs on a <b>$7/mo VM</b> · 💰 <b>&lt;$10/mo</b> in LLM inference · 🗄️ <b>Zero Docker/Redis/Postgres</b>
+</p>
+
+<p align="center">
+  <a href="#-quick-start"><b>Quick Start</b></a> ·
+  <a href="docs/ARCHITECTURE.md"><b>Architecture</b></a> ·
+  <a href="CHANGELOG.md"><b>Changelog</b></a> ·
+  <a href="CONTRIBUTING.md"><b>Contributing</b></a>
+</p>
+
+---
 
 Built entirely in Python by **Serge**.
 

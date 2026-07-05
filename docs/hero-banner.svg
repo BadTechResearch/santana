@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f0f1a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a0a2e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#7c3aed;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="border-glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#7c3aed;stop-opacity:0.3" />
+      <stop offset="100%" style="stop-color:#06b6d4;stop-opacity:0.15" />
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="url(#bg)"/>
+
+  <!-- Grid pattern -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#ffffff" stroke-opacity="0.03" stroke-width="1"/>
+  </pattern>
+  <rect width="1280" height="640" fill="url(#grid)"/>
+
+  <!-- Glow border -->
+  <rect x="1" y="1" width="1278" height="638" rx="16" fill="none" stroke="url(#border-glow)" stroke-width="1.5"/>
+
+  <!-- Terminal window -->
+  <rect x="60" y="120" width="560" height="420" rx="12" fill="#1a1b2e" stroke="#2d2d4e" stroke-width="1"/>
+  <!-- Terminal title bar -->
+  <rect x="60" y="120" width="560" height="36" rx="12" fill="#252642"/>
+  <rect x="60" y="144" width="560" height="12" fill="#252642"/>
+  <!-- Title bar buttons -->
+  <circle cx="84" cy="138" r="6" fill="#ff5f57"/>
+  <circle cx="104" cy="138" r="6" fill="#ffbd2e"/>
+  <circle cx="124" cy="138" r="6" fill="#28c840"/>
+  <text x="340" y="144" text-anchor="middle" font-family="monospace" font-size="13" fill="#888899">santana@agent ~/santana</text>
+
+  <!-- Terminal content -->
+  <text x="80" y="180" font-family="monospace" font-size="13" fill="#7c3aed">┌─<tspan fill="#888">─────────────────────────────────────────</tspan>──┐</text>
+  <text x="80" y="200" font-family="monospace" font-size="15" font-weight="bold" fill="#c4b5fd">  🎸 Santana v2.0 — Autonomous AI Agent</text>
+  <text x="80" y="220" font-family="monospace" font-size="12" fill="#888">  ───────────────────────────────────────────</text>
+
+  <text x="80" y="255" font-family="monospace" font-size="13" fill="#2dd4bf">  $ python santana.py --mode telegram</text>
+  <text x="80" y="278" font-family="monospace" font-size="13" fill="#a78bfa">  ⚡ Initializing memory layers...</text>
+  <text x="80" y="298" font-family="monospace" font-size="13" fill="#a78bfa">  ✓ Session buffer ready</text>
+  <text x="80" y="318" font-family="monospace" font-size="13" fill="#a78bfa">  ✓ Vector store loaded (1,247 embeddings)</text>
+  <text x="80" y="338" font-family="monospace" font-size="13" fill="#a78bfa">  ✓ Cost governor: $8.42/mo budget remaining</text>
+  <text x="80" y="358" font-family="monospace" font-size="13" fill="#a78bfa">  ✓ Telegram bot connected</text>
+  <text x="80" y="378" font-family="monospace" font-size="13" fill="#a78bfa">  ✓ Discord gateway active</text>
+  <text x="80" y="398" font-family="monospace" font-size="13" fill="#a78bfa">  ✓ REST API running on :8080</text>
+  <text x="80" y="430" font-family="monospace" font-size="13" fill="#2dd4bf">  ● Agent running — listening for requests...</text>
+  <text x="80" y="456" font-family="monospace" font-size="11" fill="#666">  [04:32:17] Memory consolidation cycle in 12m</text>
+  <text x="80" y="472" font-family="monospace" font-size="11" fill="#666">  [04:32:17] Cache hit rate: 94.7% | Tokens saved: 1.4M</text>
+  <text x="80" y="495" font-family="monospace" font-size="13" fill="#7c3aed">└─<tspan fill="#888">─────────────────────────────────────────</tspan>──┘</text>
+
+  <!-- Phone mockup -->
+  <rect x="720" y="80" width="500" height="480" rx="30" fill="#1a1a2e" stroke="#2d2d4e" stroke-width="1.5"/>
+  <!-- Phone notch -->
+  <rect x="860" y="80" width="220" height="28" rx="14" fill="#0f0f1a"/>
+  <!-- Phone bezel inner -->
+  <rect x="735" y="110" width="470" height="430" rx="20" fill="#16162a"/>
+
+  <!-- Telegram chat header -->
+  <rect x="735" y="110" width="470" height="50" rx="20" fill="#1f1f38"/>
+  <rect x="735" y="140" width="470" height="20" fill="#1f1f38"/>
+  
+  <!-- Avatar -->
+  <circle cx="760" cy="135" r="16" fill="#7c3aed"/>
+  <text x="760" y="140" text-anchor="middle" font-family="monospace" font-size="14" fill="white">🎸</text>
+  <text x="782" y="140" font-family="sans-serif" font-size="14" font-weight="bold" fill="white">Santana Agent</text>
+
+  <!-- Chat messages -->
+  <!-- User message -->
+  <rect x="810" y="175" width="380" height="50" rx="14" fill="#2d2d5e"/>
+  <rect x="810" y="175" width="14" height="20" rx="4" fill="#2d2d5e"/>
+  <text x="826" y="195" font-family="sans-serif" font-size="13" fill="#e0e0e0">what's the latest on my GitHub PRs?</text>
+  <text x="1155" y="210" font-family="sans-serif" font-size="10" fill="#666" text-anchor="end">11:32</text>
+
+  <!-- Bot message with bullet -->
+  <rect x="745" y="240" width="430" height="130" rx="14" fill="#252542"/>
+  <text x="761" y="262" font-family="monospace" font-size="12" fill="#2dd4bf">🔍 Checking GitHub...</text>
+  <text x="761" y="282" font-family="monospace" font-size="12" fill="#c4b5fd">→ repo: BadTechResearch/santana</text>
+  <text x="761" y="302" font-family="monospace" font-size="12" fill="#c4b5fd">→ repo: BadTechResearch/hermes-agent</text>
+  <text x="761" y="322" font-family="monospace" font-size="12" fill="#fbbf24">! PR #42: fix/memory-leak (OPEN, +12h)</text>
+  <text x="761" y="342" font-family="monospace" font-size="12" fill="#fbbf24">! PR #41: feat/twitter-tool (OPEN, +2d)</text>
+  <text x="761" y="362" font-family="monospace" font-size="12" fill="#a78bfa">• PR #42 needs your review (2 comments)</text>
+
+  <!-- Bot thinking indicator -->
+  <text x="745" y="400" font-family="monospace" font-size="11" fill="#7c3aed">⌛ Running self‑check...</text>
+  <text x="761" y="420" font-family="monospace" font-size="12" fill="#2dd4bf">✓ Memory recall: 3 related sessions found</text>
+  <text x="761" y="440" font-family="monospace" font-size="12" fill="#a78bfa">"We discussed the memory leak in our last chat —</text>
+  <text x="761" y="460" font-family="monospace" font-size="12" fill="#a78bfa"> the fix is ready for review."</text>
+
+  <!-- User typing -->
+  <text x="810" y="500" font-family="sans-serif" font-size="13" fill="#888">review the leak fix then</text>
+  <circle cx="1155" cy="495" r="3" fill="#2dd4bf" filter="url(#glow)"/>
+
+  <!-- Bottom stats bar -->
+  <text x="640" y="585" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#888">⚡ DeepSeek V4 Flash  ·  🗄️ SQLite  ·  🐙 GitHub  ·  💬 Telegram/Discord</text>
+  <text x="640" y="610" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#555">~$7/mo VM  ·  ~$9/mo inference  ·  No Docker/Redis/Postgres</text>
+</svg>
