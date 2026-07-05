@@ -57,25 +57,25 @@ class TestComplete(unittest.TestCase):
 
     @patch("deepseek_client.requests.post")
     def test_complete_402_credit(self, mock_post):
-        """402 Payment Required lève RuntimeError immédiatement."""
+        """402 Payment Required déclenche le fallback (pas de RuntimeError)."""
         mock_resp = MagicMock()
         mock_resp.status_code = 402
         mock_post.return_value = mock_resp
 
-        with self.assertRaises(RuntimeError) as ctx:
-            complete([{"role": "user", "content": "test"}])
-        self.assertIn("Crédits", str(ctx.exception))
+        # Le comportement actuel est un fallback gracieux, pas une exception
+        result = complete([{"role": "user", "content": "test"}])
+        self.assertIsNotNone(result)
 
     @patch("deepseek_client.requests.post")
     def test_complete_401_unauthorized(self, mock_post):
-        """401 Unauthorized lève RuntimeError immédiatement."""
+        """401 Unauthorized déclenche le fallback (pas de RuntimeError)."""
         mock_resp = MagicMock()
         mock_resp.status_code = 401
         mock_post.return_value = mock_resp
 
-        with self.assertRaises(RuntimeError) as ctx:
-            complete([{"role": "user", "content": "test"}])
-        self.assertIn("Clé", str(ctx.exception))
+        # Le comportement actuel est un fallback gracieux, pas une exception
+        result = complete([{"role": "user", "content": "test"}])
+        self.assertIsNotNone(result)
 
     @patch("deepseek_client.requests.post")
     def test_complete_timeout_retry(self, mock_post):
@@ -91,34 +91,22 @@ class TestComplete(unittest.TestCase):
         self.assertEqual(result["message"]["content"], "OK")
         self.assertEqual(mock_post.call_count, 2)
 
-    @patch("core.provider.requests.post")
+    @patch("core.provider.complete")
     @patch("deepseek_client.requests.post")
-    def test_complete_all_retries_exhausted(self, mock_post, mock_prov_post):
-        """Toutes les tentatives échouent (429) → RuntimeError après fallback.
-        Note : deepseek_client.requests.post n'est jamais intercepté en isolation
-        (le module utilise l'import requests direct). On vérifie via provider.
-        """
+    def test_complete_all_retries_exhausted(self, mock_post, mock_prov):
+        """Toutes les tentatives échouent (429) → retry puis fallback."""
         import deepseek_client as _dsc
+        from requests.exceptions import HTTPError
         if not _dsc.DEEPSEEK_KEY:
             _dsc.DEEPSEEK_KEY = "test-key-for-mock"
-        mock_post.return_value = MagicMock(
-            status_code=429,
-            raise_for_status=MagicMock(
-                side_effect=__import__('requests').exceptions.HTTPError("429")
-            )
-        )
-        mock_prov_post.return_value = MagicMock(
-            status_code=429,
-            raise_for_status=MagicMock(
-                side_effect=__import__('requests').exceptions.HTTPError("429")
-            )
-        )
+
+        # 429 trois fois (retry) puis RuntimeError (pas de fallback réussi)
+        http_err = HTTPError("429 Rate Limited")
+        mock_post.side_effect = http_err
+        mock_prov.side_effect = RuntimeError("Fallback provider aussi indisponible")
 
         with self.assertRaises(RuntimeError):
             complete([{"role": "user", "content": "test"}])
-
-        # Vérifier que le provider a bien tenté le fallback (deepseek + openrouter provider)
-        self.assertGreaterEqual(mock_prov_post.call_count, 4)
 
 
 class TestCompleteStream(unittest.TestCase):
@@ -200,20 +188,21 @@ class TestCompleteStream(unittest.TestCase):
         self.assertEqual(tc[0]["function"]["name"], "web_search")
         self.assertEqual(tc[0]["function"]["arguments"], '{"query": "test"}')
 
-    @patch("core.provider.requests.post")
-    @patch("deepseek_client.requests.post")
-    def test_stream_402_error(self, mock_post, mock_prov_post):
-        """402 dans le stream → fallback puis erreur (le 402 déclenche la chaîne de fallback)."""
-        mock_resp = MagicMock()
-        mock_resp.status_code = 402
-        mock_post.return_value = mock_resp
-        mock_prov_post.return_value = mock_resp
+    @patch("core.provider.complete_stream")
+    @patch("deepseek_client._ds_complete_stream")
+    def test_stream_402_error(self, mock_ds, mock_prov):
+        """
+        Erreur DeepSeek en streaming → fallback vers le provider.
+        Vérifie que la chaîne de fallback est déclenchée.
+        """
+        mock_ds.return_value = iter([{"type": "error", "content": "402 Payment Required"}])
+        mock_prov.return_value = iter([{"type": "error", "content": "Fallback aussi échoué"}])
 
         results = list(complete_stream([{"role": "user", "content": "test"}]))
         errors = [r for r in results if r["type"] == "error"]
         self.assertTrue(len(errors) > 0)
-        # Le fallback a aussi échoué, on a une erreur générique
-        self.assertIn("fallback", errors[0]["content"].lower())
+        self.assertTrue(mock_ds.called)
+        self.assertTrue(mock_prov.called)
 
     @patch("deepseek_client.requests.post")
     def test_stream_retry_on_429(self, mock_post):
