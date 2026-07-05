@@ -85,6 +85,18 @@ def _init_counter():
             last_cleanup_at TEXT
         )''')
         c.execute("INSERT OR IGNORE INTO atlas_cleanup (id, last_cleanup_at) VALUES (1, NULL)")
+        # Table registres — personnes, decisions, dates
+        c.execute('''CREATE TABLE IF NOT EXISTS registres (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            type TEXT, content TEXT, context TEXT,
+            tags TEXT, created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )''')
+        # Table livres — psychologie, famille, projets, vision_btr
+        c.execute('''CREATE TABLE IF NOT EXISTS livres (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            livre TEXT, content TEXT, tag TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )''')
         conn.commit()
         _INIT_DONE = True
     except Exception as e:
