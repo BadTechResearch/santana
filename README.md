@@ -15,7 +15,7 @@
   <a href="docs/ARCHITECTURE.md">
     <img src="https://img.shields.io/badge/Docs-ARCHITECTURE-06b6d4?style=flat" alt="Architecture">
   </a>
-  <img src="https://img.shields.io/badge/Cost-%3C%2417%2Fmo-2dd4bf?style=flat" alt="Cost">
+  <img src="https://img.shields.io/badge/Cost-%246%E2%80%9312%2Fmo-2dd4bf?style=flat" alt="Cost">
   <img src="https://img.shields.io/badge/Infra-No%20Docker%20%E2%9C%93-2dd4bf?style=flat" alt="No Docker">
   <a href="https://github.com/BadTechResearch/santana/actions/workflows/test.yml">
     <img src="https://img.shields.io/github/actions/workflow/status/BadTechResearch/santana/test.yml?style=flat&label=CI&color=22c55e" alt="CI">
@@ -26,7 +26,7 @@
 <p align="center">
   <b>Santana</b> — the AI agent that works in Africa.<br>
   No GPU. No fiber. No credit card required.<br>
-  🚀 Runs on a <b>$7/mo VM</b> · 💰 <b>&lt;$10/mo</b> in LLM inference · 🗄️ <b>Zero Docker/Redis/Postgres</b>
+  🚀 The most powerful agent, the cheapest in the world · 💰 <b>$6-12/mo</b> all-in · 🗄️ <b>Zero Docker/Redis/Postgres</b>
 </p>
 
 <p align="center">
@@ -67,7 +67,7 @@ It's built for the constraints of African developers, indie hackers, and anyone 
 - **No Postgres** → everything in one file
 - **No GPU** → all-MiniLM-L6-v2 on CPU (80 MB, runs anywhere)
 - **No fiber** → DeepSeek V4 Flash via REST API (works on a 3G hotspot)
-- **No credit card needed** → ~$17/month total (VM + inference)
+- **No credit card needed** → ~$6-12/month total (VM + inference)
 
 ### Cost transparency
 
