@@ -32,6 +32,10 @@ TOOLS = json.load(open(os.path.join(BASE_DIR, "tools", "tools.json"), "r"))
 
 # ─── Outils spécialisés importés ────────────────────────────────────────
 from tools.web_search import tool_web_search
+
+# ─── Tool Creator (création dynamique d'outils par le LLM) ─────────────────
+from tools.tool_creator import create_tool as _tool_creator_create, install_dependencies as _tool_creator_install
+from tools.tool_creator import list_user_tools as _tool_creator_list, delete_user_tool as _tool_creator_delete
 from tools.memory_ops import tool_memory_query, tool_atlas
 from tools.social_search import social_search as tool_social_search_raw
 from tools.social_search import tool_social_news, tool_social_browser, tool_twitter_search, tool_reddit_search
@@ -50,6 +54,7 @@ from tools.pdf_reader import read_pdf as _read_pdf_raw
 # ─── Modules @tool : enregistrement automatique via décorateur ───────────
 # Chaque import déclenche les décorateurs @tool() qui s'enregistrent
 # dans tools/registry.py.
+from tools import code_modify  # expose code_modify, code_list_sources, restart_self
 
 # ─── Outils MCP (chargement paresseux, Correctif 3) ─────────────────────────
 _MCP_TOOLS_CACHED = None
@@ -261,12 +266,17 @@ def tool_fs_write(path: str, content: str) -> str:
     Returns:
         Confirmation ou message d'erreur
     """
-    _WRITE_SAFE_DIRS = ["skills", "workspace"]
+    _WRITE_SAFE_DIRS = ["tools", "agent", "core", "skills", "workspace", "tests", "soul", "scripts", "metrics", "atlas_engine", "memory"]
     # Normaliser le chemin
     clean_path = path.lstrip("/").lstrip(".")
     parts = clean_path.split("/")
     if not parts or parts[0] not in _WRITE_SAFE_DIRS:
         return f"Erreur: écriture autorisée uniquement dans {_WRITE_SAFE_DIRS}."
+    # Extension autorisée
+    _ALLOWED_EXTS = {".py", ".md", ".toml", ".txt", ".json", ".yaml", ".yml", ".cfg", ".ini", ".sh"}
+    ext = os.path.splitext(clean_path)[1].lower()
+    if ext and ext not in _ALLOWED_EXTS:
+        return f"Erreur: extension '{ext}' non autorisée."
     abs_path = os.path.realpath(os.path.join(_SAFE_BASE, clean_path))
     if not abs_path.startswith(_SAFE_BASE):
         return "Erreur: chemin hors de ~/santana/."
@@ -692,6 +702,17 @@ def tool_vm_exec_script(script: str, workdir: str = "") -> str:
     except Exception as e:
         return f"Erreur script: {str(e)}"
 
+
+# ── Enregistrement des outils de tool_creator ──────────────────────────
+_reg_register("tool_create", _tool_creator_create,
+    arg_map={"name": "name", "description": "description", "parameters_json": "parameters_json",
+             "code": "code", "dependencies": "dependencies", "requires_network": "requires_network"},
+    defaults={"parameters_json": "{}", "dependencies": "", "requires_network": False})
+_reg_register("install_dependencies", _tool_creator_install,
+    arg_map={"name": "name", "requirements": "requirements"})
+_reg_register("list_user_tools", _tool_creator_list)
+_reg_register("delete_user_tool", _tool_creator_delete,
+    arg_map={"name": "name"})
 
 # ── Enregistrement des outils définis ci-dessus ─────────────────────────
 # (placé ici car les fonctions sont définies plus haut dans ce fichier)

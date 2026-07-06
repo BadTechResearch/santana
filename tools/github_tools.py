@@ -38,9 +38,10 @@ _GIT_NAME = "Santana"
 GITHUB_ACCOUNT = "BadTechResearch"
 GITHUB_HOST = "github.com"
 
-# Liste des repos connus — restreint à CODEX-BRAINSTORM uniquement (refactoring CODE)
+# Liste des repos connus
 _KNOWN_REPOS = {
     "CODEX-BRAINSTORM": "Le deuxième cerveau — brainstorming et mémoire longue de Serge",
+    "santana": "Le code source de Santana — auto-modification et évolution",
 }
 
 # ── Utilitaires bas niveau ────────────────────────────────────────────────
