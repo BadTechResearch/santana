@@ -5,6 +5,7 @@
 import os, json, logging, asyncio, fcntl, signal, sys, time, subprocess
 from datetime import datetime
 import pytz; _TZ = pytz.timezone("Europe/Brussels")
+from core.utils import get_base_dir
 
 BASE_DIR = get_base_dir()
 ENV_PATH = os.path.join(BASE_DIR, '.env')
@@ -26,7 +27,7 @@ _RATE_WINDOW = 2.0
 # ── Boot time pour /status ──
 _BOOT_TIME = __import__('time').time()
 
-from core.utils import load_env, TokenFilter, get_base_dir
+from core.utils import load_env, TokenFilter
 load_env(ENV_PATH)
 print(f"[SANTANA BOOT] DEEPSEEK_MODEL='{os.getenv('DEEPSEEK_MODEL', 'NOT_LOADED')}'", flush=True)
 
