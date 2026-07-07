@@ -30,10 +30,18 @@ _MSGTYPE_LABEL = {
     "PERSONNEL": "",
 }
 
+_MSGTYPE_FOOTER = {
+    "SYNTHESE": "\n━━━━━━━━━━━━━━━━━━\n📌 *Synthèse BTR*",
+    "DEEP": "\n━━━━━━━━━━━━━━━━━━\n🎸 *Santana — Analyse*",
+}
+
 
 def _markdown_to_telegram_html(text: str) -> str:
-    """Convertit le Markdown que produit Santana (le prompt système lui
-    demande **gras**, ## titres, listes, `code`) en HTML Telegram.
+    """Convertit le Markdown que produit Santana en HTML Telegram.
+
+    Support complet : titres, **gras**, *italique*, `code`, ```code blocks```,
+    [liens](url), listes - et 1., blockquotes >, ~~barré~~, ||spoiler||,
+    séparateurs ---.
 
     Pourquoi HTML plutôt que MarkdownV2 : Telegram n'exige d'échapper que
     3 caractères (&, <, >) contre une dizaine en MarkdownV2 (_ * [ ] ( ) ~
@@ -42,22 +50,66 @@ def _markdown_to_telegram_html(text: str) -> str:
     En HTML, échapper d'abord puis n'introduire que des balises qu'on
     contrôle nous-mêmes élimine ce risque par construction.
     """
-    # 1. Échapper les caractères spéciaux HTML AVANT d'introduire nos propres balises
-    escaped = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    # 0. Sauvegarder les blocs de code fencés AVANT tout échappement
+    code_blocks = []
 
-    # 2. Titres Markdown (## / ###) en début de ligne -> gras (Telegram HTML n'a pas de <h1>)
+    def _save_code(m):
+        code_blocks.append(m.group(2))
+        return f"\x00CODEBLOCK_{len(code_blocks) - 1}\x00"
+
+    text = re.sub(
+        r'```(\w*)\n(.*?)```(?!`)',
+        _save_code, text, flags=re.DOTALL,
+    )
+
+    # 1. Échapper & (toujours dangereux) MAIS PAS < ni > pour l'instant
+    #    (< et > sont échappés APRÈS les regex qui en ont besoin, comme > pour blockquotes)
+    escaped = text.replace("&", "&amp;")
+
+    # 2. Blockquotes (doivent être AVANT l'échappement de < et >)
+    #    On utilise des placeholders pour protéger les tags <i> qu'on génère.
+    escaped = re.sub(r"^>\s+(.+)$", lambda m: f"\x00BQ\x00▎ {m.group(1)}\x00/BQ\x00", escaped, flags=re.MULTILINE)
+
+    # 3. Échapper < et > restants (ceux qui n'ont pas été consommés par les regex ci-dessus)
+    escaped = escaped.replace("<", "&lt;").replace(">", "&gt;")
+
+    # Restaurer les tags blockquote
+    escaped = escaped.replace("\x00BQ\x00", "<i>").replace("\x00/BQ\x00", "</i>")
+
+    # 4. Titres Markdown (## / ###) en début de ligne -> gras
     escaped = re.sub(r"^#{1,6}\s+(.+)$", r"<b>\1</b>", escaped, flags=re.MULTILINE)
 
-    # 3. Gras **texte** -> <b>texte</b> (non-greedy, avant l'italique simple
-    #    pour ne pas confondre les deux étoiles d'un ** avec deux * simples)
+    # 5. Gras **texte** -> <b>texte</b>
     escaped = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", escaped)
 
-    # 4. Code `texte` -> <code>texte</code>
+    # 6. Code inline `texte` -> <code>texte</code>
     escaped = re.sub(r"`([^`\n]+?)`", r"<code>\1</code>", escaped)
 
-    # 5. Italique *texte* ou _texte_ restant -> <i>texte</i>
+    # 7. Italique *texte* ou _texte_ -> <i>texte</i>
     escaped = re.sub(r"(?<!\*)\*([^*\n]+?)\*(?!\*)", r"<i>\1</i>", escaped)
     escaped = re.sub(r"(?<!_)_([^_\n]+?)_(?!_)", r"<i>\1</i>", escaped)
+
+    # 8. Liens [texte](url) -> <a href="url">texte</a>
+    escaped = re.sub(r"\[([^\]]+)\]\(([^)]+)\)", r'<a href="\2">\1</a>', escaped)
+
+    # 9. Listes non ordonnées en début de ligne -> bullet unicode
+    escaped = re.sub(r"^[\-\*\+]\s+(.+)$", lambda m: f"• {m.group(1)}", escaped, flags=re.MULTILINE)
+
+    # 10. Barré ~~texte~~ -> <s>texte</s>
+    escaped = re.sub(r"~~(.+?)~~", r"<s>\1</s>", escaped)
+
+    # 11. Spoiler ||texte|| -> <tg-spoiler>texte</tg-spoiler>
+    escaped = re.sub(r"\|\|(.+?)\|\|", r"<tg-spoiler>\1</tg-spoiler>", escaped)
+
+    # 12. Séparateurs --- / *** / ___ -> ligne décorative
+    escaped = re.sub(r"^[-_*]{3,}\s*$", "\n━━━━━━━━━━━━━━━━━━\n", escaped, flags=re.MULTILINE)
+
+    # 13. Restaurer les blocs de code fencés
+    for i, code in enumerate(code_blocks):
+        placeholder = f"\x00CODEBLOCK_{i}\x00"
+        # Échapper le HTML dans le code pour affichage littéral
+        safe = code.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        escaped = escaped.replace(placeholder, f"<pre>{safe}</pre>")
 
     return escaped
 
@@ -68,21 +120,37 @@ def _strip_html_tags(text: str) -> str:
     return plain.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
 
 
+def _find_safe_cut(text: str, limit: int) -> int:
+    """Trouve une coupure qui ne brise pas la structure HTML."""
+    # Ne pas couper dans <pre>...</pre> ou <code>...</code>
+    for tag, end_tag in [('<pre>', '</pre>'), ('<code>', '</code>')]:
+        last_open = text.rfind(tag, 0, limit)
+        if last_open > 0:
+            last_close = text.rfind(end_tag, last_open, limit)
+            if last_close < last_open:
+                # On est dans un bloc ouvert → couper APRÈS la fermeture
+                next_close = text.find(end_tag, limit)
+                if next_close > 0:
+                    return next_close + len(end_tag)
+    # Priorité: saut de paragraphe → saut de ligne → ponctuation → caractère
+    for sep in ['\n\n', '\n', '. ', ' ']:
+        cut = text.rfind(sep, 0, limit)
+        if cut > 0:
+            return cut
+    return limit
+
+
 def _split_for_telegram(text: str, limit: int = _MAX_MSG_LEN) -> list[str]:
-    """Découpe un texte trop long en plusieurs messages, de préférence sur
-    un saut de paragraphe pour ne pas couper une phrase en deux."""
+    """Découpe un texte trop long en plusieurs messages, en protégeant
+    la structure HTML (ne pas couper dans <pre>, <code>)."""
     if len(text) <= limit:
         return [text]
     parts = []
     remaining = text
     while len(remaining) > limit:
-        cut = remaining.rfind("\n\n", 0, limit)
-        if cut <= 0:
-            cut = remaining.rfind("\n", 0, limit)
-        if cut <= 0:
-            cut = limit
-        parts.append(remaining[:cut].rstrip())
-        remaining = remaining[cut:].lstrip()
+        safe_cut = _find_safe_cut(remaining, limit)
+        parts.append(remaining[:safe_cut].rstrip())
+        remaining = remaining[safe_cut:].lstrip()
     if remaining:
         parts.append(remaining)
     return parts
@@ -116,6 +184,7 @@ class TelegramStream:
         self._progress_msg = ""
         self._on_first_content = None
         self._has_sent_content = False
+        self._show_cursor = True
 
     def set_on_first_content(self, callback):
         """Enregistre une coroutine à exécuter dès le premier contenu réel
@@ -151,6 +220,7 @@ class TelegramStream:
             self._progress_msg = ""
 
         self.buffer += chunk
+        self._show_cursor = True  # nouveau contenu → réafficher le curseur
         self._schedule_edit(self.buffer)
 
     def _schedule_edit(self, display_text: str):
@@ -180,26 +250,58 @@ class TelegramStream:
                 shown = shown[:_MAX_MSG_LEN - 40] + f"\n\n… *(+{remaining} caractères)*"
             if not shown.strip():
                 return
-            cursor = shown + " ▌"
+            # Curseur clignotant : présent pendant le streaming, retiré
+            # pendant l'attente d'un outil (buffer stable).
+            if self._show_cursor:
+                cursor = shown + " ▌"
+                self._show_cursor = False  # une fois affiché, attente prochain chunk
+            else:
+                cursor = shown
+            # Conversion en HTML pendant le stream : les tag non-fermés sont
+            # ignorés par les regex non-greedy, Telegram tolère le HTML partiel.
+            html = _markdown_to_telegram_html(cursor)
             try:
                 if self.message_id is None:
-                    msg = await self.bot.send_message(chat_id=self.chat_id, text=cursor)
+                    msg = await self.bot.send_message(
+                        chat_id=self.chat_id, text=html, parse_mode="HTML",
+                    )
                     self.message_id = msg.message_id
                 else:
                     await self.bot.edit_message_text(
-                        chat_id=self.chat_id, message_id=self.message_id, text=cursor
+                        chat_id=self.chat_id, message_id=self.message_id,
+                        text=html, parse_mode="HTML",
                     )
                 self._last_edit_ts = time.time()
             except Exception as e:
                 # "Message is not modified" et les 429 ponctuels ne sont pas fatals —
                 # le prochain chunk ou finalize() rattrapera l'affichage.
-                logger.debug("[TG_STREAM] Édition ignorée: %s", e)
+                # Si le HTML a échoué (tags mal formés), retenter en texte brut.
+                if "can't parse entities" in str(e).lower() or "bad request" in str(e).lower():
+                    try:
+                        plain = _strip_html_tags(html)
+                        if self.message_id is None:
+                            msg = await self.bot.send_message(
+                                chat_id=self.chat_id, text=plain,
+                            )
+                            self.message_id = msg.message_id
+                        else:
+                            await self.bot.edit_message_text(
+                                chat_id=self.chat_id, message_id=self.message_id, text=plain,
+                            )
+                    except Exception:
+                        logger.debug("[TG_STREAM] Repli texte brut échoué aussi")
+                else:
+                    logger.debug("[TG_STREAM] Édition ignorée: %s", e)
 
-    async def _send_or_edit(self, index: int, text: str):
+    async def _send_or_edit(self, index: int, text: str, is_last: bool = False):
         """Envoie/édite UNE partie avec mise en forme HTML, et se replie en
-        texte brut (sans balises) si Telegram rejette le HTML (tags mal
-        formés que la conversion n'aurait pas dû produire, mais mieux vaut
-        livrer un message lisible que ne rien livrer)."""
+        texte brut (sans balises) si Telegram rejette le HTML. Ajoute un
+        footer de type pour la dernière partie."""
+        # Ajouter le footer pour la dernière partie
+        if is_last:
+            footer = _MSGTYPE_FOOTER.get(self.msg_type, "")
+            if footer:
+                text += footer
         html = _markdown_to_telegram_html(text)
         is_first_edit = index == 0 and self.message_id is not None
         try:
@@ -234,8 +336,7 @@ class TelegramStream:
     async def finalize(self, response: str):
         """Envoie la réponse finale, propre (sans curseur), en la découpant
         si elle dépasse la limite Telegram et en appliquant le formatage
-        HTML (jamais pendant le streaming — le texte partiel a des balises
-        Markdown non fermées, ce qui casserait le parsing à chaque édition).
+        HTML. Ajoute pagination et connecteurs pour les réponses longues.
         Remplace le brouillon en cours d'édition par le texte définitif."""
         response = response or "…"
         label = _MSGTYPE_LABEL.get(self.msg_type, "")
@@ -245,5 +346,9 @@ class TelegramStream:
         # ses propres balises **/`` équilibrées — pas de <b> ouvert dans une
         # partie et fermé dans la suivante.
         parts = _split_for_telegram(response)
+        total = len(parts)
         for i, part in enumerate(parts):
-            await self._send_or_edit(i, part)
+            if total > 1 and i > 0:
+                part = f"📎 *Suite (partie {i + 1}/{total})*\n\n{part}"
+            is_last = (i == total - 1)
+            await self._send_or_edit(i, part, is_last=is_last)

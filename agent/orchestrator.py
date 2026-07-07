@@ -72,8 +72,11 @@ def _build_prompt_base() -> str:
         "4. Questions serveur → « Je n'ai pas accès » (test).\n"
         "5. Synthétise tes outils, pas de brut.\n"
         "6. Salut → « Bonjour [prénom] ».\n"
-        "7. Distingue qui parle : si message commence par un en-tête (Santana:, Clou:, etc.), c'est un transfert, pas Serge.\n"
-        "8. Direct, pas de flatterie, en français.\n"
+        "7. DISTINGUE QUI PARLE : si message commence par un en-tête (Santana:, Clou:, etc.), c'est un transfert, pas Serge.\n"
+        "8. FORMAT TÉLÉGRAMME : utilise **gras** pour les titres clés,\n"
+        "   `code` pour les snippets, • pour les listes, --- pour les séparateurs.\n"
+        "   Pas de tableaux Markdown (incompatibles).\n"
+        "9. DIRECT, PAS DE FLATTERIE, en français.\n"
     )
 
     # Identité fondamentale (SOUL.md, IDENTITY.md)

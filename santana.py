@@ -223,7 +223,12 @@ async def handle_message(update: Update, context):
     except Exception as e:
         logging.error(f"[HANDLER] handle_message error: {e}")
         try:
-            await update.message.reply_text(f"❌ Erreur: {str(e)[:200]}")
+            await update.message.reply_text(
+                "⚠️ <b>Erreur</b>\n\n"
+                f"<code>{str(e)[:200]}</code>\n\n"
+                "🔁 Tu peux essayer <b>/reset</b> pour réinitialiser la session.",
+                parse_mode="HTML",
+            )
         except Exception:
             pass
 
