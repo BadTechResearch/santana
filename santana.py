@@ -176,7 +176,7 @@ async def _typing_loop(bot, chat_id: int):
     try:
         while True:
             await bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
-            await asyncio.sleep(4)
+            await asyncio.sleep(2.5)
     except asyncio.CancelledError:
         pass
     except Exception as e:
@@ -233,28 +233,11 @@ async def handle_message(update: Update, context):
             pass
 
 
-async def handle_voice(update: Update, context):
-    await update.message.reply_text("🎤 Fichier audio non supporté pour le moment")
-
-
-async def handle_photo(update: Update, context):
-    await update.message.reply_text("🖼️ Photo non supportée pour le moment")
-
-
-async def handle_video(update: Update, context):
-    await update.message.reply_text("🎬 Vidéo non supportée pour le moment")
-
-
-async def handle_document(update: Update, context):
-    await update.message.reply_text("📄 Document non supporté pour le moment")
-
-
-async def handle_webapp_data(update: Update, context):
-    logging.info("[WEBAPP] Données webapp reçues (non traitées)")
-
-
-async def handle_callback_query(update: Update, context):
-    await update.callback_query.answer("Fonction non disponible")
+# Handlers désactivés : ces types de média ne sont pas encore supportés.
+# Les handlers correspondants (voice, photo, video, document, webapp_data,
+# callback_query) ont été supprimés le 07/07/2026 car ils ne faisaient que
+# répondre "non supporté" — 6 handlers enregistrés pour 0 messages réels.
+# Réactiver par handler individuel si le support est ajouté.
 
 
 os.makedirs(BASE_DIR, exist_ok=True)
@@ -406,12 +389,8 @@ if __name__ == '__main__':
     ]:
         app.add_handler(CommandHandler(cmd, handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-    app.add_handler(MessageHandler(filters.VOICE, handle_voice))
-    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
-    app.add_handler(MessageHandler(filters.VIDEO, handle_video))
-    app.add_handler(MessageHandler(filters.Document.ALL, handle_document))
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp_data))
-    app.add_handler(CallbackQueryHandler(handle_callback_query))
+    # Handlers média supprimés le 07/07/2026 (tous morts : voice, photo, video,
+    # document, webapp_data, callback_query — voir commentaire plus haut)
 
     # ── Watchdog systemd (sd_notify via ctypes — PID correct garantit) ──
     _WD_CTX = None  # (lib, sd_notify) ou None si pas de systemd

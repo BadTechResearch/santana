@@ -20,7 +20,7 @@ import time
 logger = logging.getLogger(__name__)
 
 _MAX_MSG_LEN = 4096          # limite Telegram par message
-_EDIT_MIN_INTERVAL = 0.8     # secondes entre deux editMessageText (flood control)
+_EDIT_MIN_INTERVAL = 0.4     # secondes entre deux editMessageText (flood control)
 
 _MSGTYPE_LABEL = {
     "SOCIAL": "",
