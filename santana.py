@@ -190,22 +190,36 @@ async def handle_message(update: Update, context):
         await update.message.reply_text("❌ Non autorisé")
         return
     try:
+        # Placeholder immédiat : l'utilisateur voit une réponse démarrer tout
+        # de suite au lieu de fixer la bulle "typing..." pendant 5-15s.
+        placeholder = await update.message.reply_text("🧠 Je réfléchis…")
+
         # Lancer le typing indicator immédiatement — coupé dès que le premier
-        # contenu (réel ou heartbeat d'outil) s'affiche réellement à l'écran,
-        # pour ne pas superposer la bulle "typing..." native à un message déjà
-        # visible et en cours d'édition (les deux indicateurs se battaient
-        # sinon pendant toute la durée du streaming).
+        # contenu réel s'affiche réellement à l'écran, pour ne pas superposer
+        # la bulle "typing..." native à un message déjà visible et en cours
+        # d'édition (les deux indicateurs se battaient sinon pendant toute la
+        # durée du streaming).
         typing_task = asyncio.create_task(_typing_loop(context.bot, chat_id))
-        stream = TelegramStream(context.bot, chat_id)
-        try:
-            response = await react_loop(user_msg, stream_callback=stream.callback)
-            await stream.finalize(response)
-        finally:
+        stream = TelegramStream(context.bot, chat_id, existing_message=placeholder)
+
+        async def _cancel_typing():
             typing_task.cancel()
             try:
                 await typing_task
             except asyncio.CancelledError:
                 pass
+        stream.set_on_first_content(_cancel_typing)
+
+        try:
+            response = await react_loop(user_msg, stream_callback=stream.callback)
+            await stream.finalize(response)
+        finally:
+            if not typing_task.done():
+                typing_task.cancel()
+                try:
+                    await typing_task
+                except asyncio.CancelledError:
+                    pass
     except Exception as e:
         logging.error(f"[HANDLER] handle_message error: {e}")
         try:

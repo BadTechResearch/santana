@@ -103,17 +103,24 @@ class TelegramStream:
     sans bloquer le thread de streaming.
     """
 
-    def __init__(self, bot, chat_id: int):
+    def __init__(self, bot, chat_id: int, existing_message=None):
         self.bot = bot
         self.chat_id = chat_id
         self.buffer = ""
         self.msg_type = ""
-        self.message_id: int | None = None
+        self.message_id: int | None = existing_message.message_id if existing_message else None
         self._last_edit_ts = 0.0
         self._edit_lock = asyncio.Lock()
         self._loop = asyncio.get_event_loop()
         self._pending_edit = False
-        # _progress_msg_id supprimé (les progressions outil ne sont plus affichées)
+        self._progress_msg = ""
+        self._on_first_content = None
+        self._has_sent_content = False
+
+    def set_on_first_content(self, callback):
+        """Enregistre une coroutine à exécuter dès le premier contenu réel
+        (permet à l'appelant d'annuler le typing indicator au bon moment)."""
+        self._on_first_content = callback
 
     # ── Appelé par react_loop(), depuis un thread — jamais de await ici ──
     def callback(self, chunk: str):
@@ -121,15 +128,28 @@ class TelegramStream:
             return
         if chunk.startswith("__MSGTYPE__"):
             self.msg_type = chunk[len("__MSGTYPE__"):]
+            label = _MSGTYPE_LABEL.get(self.msg_type, "")
+            if label and not self._has_sent_content:
+                self._schedule_edit(label + "…")
             return
-        # ⏳ Progressions outils — supprimées car mal intégrées au streaming.
-        # L'ancienne implémentation envoyait des messages séparés qui
-        # s'accumulaient (échecs d'édition → nouveaux messages) avec des
-        # dots lentes (2s). La seule UX propre serait un suffixe dans le
-        # buffer principal effacé à l'arrivée du contenu réel — pas un
-        # message dédié. Voir https://github.com/openclaw/santana/issues
         if chunk.startswith("__PROGRESS__"):
+            self._progress_msg = chunk[len("__PROGRESS__"):]
+            self._schedule_edit(self.buffer)
             return
+
+        # Premier contenu réel → annuler le typing (planifié sur la boucle
+        # asyncio de l'appelant, ce callback tourne dans un thread).
+        if not self._has_sent_content:
+            self._has_sent_content = True
+            if self._on_first_content:
+                try:
+                    asyncio.run_coroutine_threadsafe(self._on_first_content(), self._loop)
+                except Exception:
+                    pass
+
+        if self._progress_msg:
+            self._progress_msg = ""
+
         self.buffer += chunk
         self._schedule_edit(self.buffer)
 
@@ -150,7 +170,14 @@ class TelegramStream:
         if self._edit_lock.locked():
             return  # une édition est déjà en vol, ne pas empiler
         async with self._edit_lock:
-            shown = display_text[-_MAX_MSG_LEN:]
+            shown = display_text
+            if self._progress_msg:
+                shown += "\n\n⏳ " + self._progress_msg
+            if len(shown) > _MAX_MSG_LEN:
+                # Afficher le DÉBUT (pas la fin) : sur une réponse longue,
+                # l'utilisateur doit voir le texte qui s'écrit dans l'ordre.
+                remaining = len(shown) - (_MAX_MSG_LEN - 40)
+                shown = shown[:_MAX_MSG_LEN - 40] + f"\n\n… *(+{remaining} caractères)*"
             if not shown.strip():
                 return
             cursor = shown + " ▌"

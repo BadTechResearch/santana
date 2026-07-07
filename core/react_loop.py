@@ -20,6 +20,7 @@ from core.json_logger import json_log
 from core.cache import cache_get, cache_set, cache_purge_all
 import threading
 from agent.evaluator import evaluate_response, log_evaluation
+from core.loop_evolution import pulse, pulse_error, get_pulse_summary
 
 # ─── Garde-fou : validation des appels outils avant exécution ──────────
 _ALLOWED_TOOL_NAMES = frozenset(t["function"]["name"] for t in TOOLS)
@@ -212,14 +213,10 @@ def _get_tool_progress(tname: str, targs: dict) -> str:
 
 def _run_tool_with_heartbeat(tname: str, targs: dict,
                               stream_callback=None) -> str:
-    """Execute un outil avec heartbeat silencieux.
-
-    Les progressions __PROGRESS__ ont été supprimées : elles créaient des
-    messages Telegram séparés qui s'accumulaient (échecs d'édition) sans
-    apporter de valeur utilisateur réelle. Le heartbeat ne sert plus qu'à
-    éviter de bloquer la boucle asynchrone sur les outils lents (web_search,
-    code_exec, etc.) avec un timeout technique.
-    """
+    """Execute un outil avec heartbeat : envoie une progression __PROGRESS__
+    initiale via _get_tool_progress(), puis rafraîchit toutes les ~6s si
+    l'outil est lent. TelegramStream affiche ce suffixe sans le mélanger au
+    buffer de contenu réel (voir tools/telegram_stream.py::callback)."""
     result = {"val": "", "done": False}
 
     def _run():
@@ -232,9 +229,19 @@ def _run_tool_with_heartbeat(tname: str, targs: dict,
     t = threading.Thread(target=_run, daemon=True)
     t.start()
 
-    # Boucle d'attente silencieuse (pas de progression utilisateur)
+    if stream_callback:
+        progress = _get_tool_progress(tname, targs)
+        stream_callback(f"__PROGRESS__{progress}")
+
+    heartbeat_count = 0
     while not result["done"]:
-        time.sleep(1.0)
+        time.sleep(2.0)
+        heartbeat_count += 1
+        if stream_callback and heartbeat_count >= 3:  # Rafraîchir toutes les 6s
+            progress = _get_tool_progress(tname, targs)
+            dots = "." * (heartbeat_count % 4)
+            stream_callback(f"__PROGRESS__{progress}{dots}")
+            heartbeat_count = 0
 
     t.join(timeout=1)
     return result["val"]
@@ -375,9 +382,9 @@ async def react_loop(user_message: str,
     # Déterminer la longueur pour le routage
     text_len = len(user_message.strip())
 
-    # Signale le type de message au front-end Telegram (choix du transport de
-    # streaming — draft natif vs édition, voir tg_handlers/messages.py) avant
-    # le premier appel LLM. Convention de préfixe identique à "__PROGRESS__".
+    # Signale le type de message au front-end Telegram (voir
+    # tools/telegram_stream.py::TelegramStream.callback) avant le premier
+    # appel LLM. Convention de préfixe identique à "__PROGRESS__".
     if stream_callback:
         stream_callback("__MSGTYPE__" + msg_type)
 
@@ -663,6 +670,7 @@ async def react_loop(user_message: str,
                 _tools_called.add(tname)
                 # Détection boucle outil : si le même outil échoue 3× de suite → quarantaine 1h
                 if "error" in tresult[:50].lower() or "exception" in tresult[:50].lower():
+                    pulse_error(tname, tresult[:200])
                     if tname == _last_tool_error[1]:
                         _last_tool_error[0] += 1
                     else:
@@ -738,6 +746,12 @@ def _finalize(response: str, user_message: str = "", msg_type: str = "", tools_u
         push_exchange("assistant", response)
     except Exception as _pe:
         logging.error(f"[FINALIZE] push_exchange error: {_pe}")
+
+    # Pulse : metriques d'auto-evolution (Loop Engineering)
+    try:
+        pulse(response, user_message, tools_used)
+    except Exception as _le:
+        logging.error(f"[FINALIZE] pulse error: {_le}")
 
     # Détection de patterns (F5) : enregistrement automatique de l'interaction
     if user_message:
