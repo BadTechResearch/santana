@@ -183,7 +183,7 @@ _TOOLS_BY_TYPE = {
     # Analyse approfondie → recherche + social + code + meta
     "DEEP":      ["search", "social_search", "social_lookup",
                   "memory", "code", "meta"],
-    # Personnel → tout sauf admin
+    # Personnel → tout (y compris GitHub, MCP)
     "PERSONNEL": ["search", "social_search", "social_lookup",
                   "memory", "code", "github", "meta"],
     # Salutations → pas d'outils du tout
