@@ -11,7 +11,7 @@ BASE_DIR = get_base_dir()
 _TZ = None
 try:
     import pytz
-    _TZ = pytz.timezone("Europe/Brussels")
+    _TZ = pytz.timezone("Africa/Kinshasa")
 except Exception as e:
     logging.error("[MEMORY_OPS] pytz fallback: %s", e)
 

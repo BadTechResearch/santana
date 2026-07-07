@@ -4,7 +4,7 @@
 
 import os, json, logging, asyncio, fcntl, signal, sys, time, subprocess
 from datetime import datetime
-import pytz; _TZ = pytz.timezone("Europe/Brussels")
+import pytz; _TZ = pytz.timezone("Africa/Kinshasa")
 from core.utils import get_base_dir
 
 BASE_DIR = get_base_dir()

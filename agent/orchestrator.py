@@ -52,7 +52,7 @@ def _build_prompt_base() -> str:
     """
     try:
         import pytz
-        now = datetime.now(pytz.timezone("Europe/Brussels")).strftime("%A %d %B %Y, %H:%M")
+        now = datetime.now(pytz.timezone("Africa/Kinshasa")).strftime("%A %d %B %Y, %H:%M")
     except Exception as e:
         logging.error("[SYSTEM] pytz timezone fallback: %s", e)
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
