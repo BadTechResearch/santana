@@ -20,9 +20,13 @@ logger = logging.getLogger(__name__)
 # Ces scans ne changent qu'au déploiement (nouveau code, nouveau commit) —
 # avant, ils relisaient TOUS les .py de agent/, memory/, atlas_engine/ et
 # tests/ à CHAQUE tour de la boucle ReAct, dans le chemin critique avant
-# même le premier appel LLM. git et système restent recalculés à chaque
-# appel (peu coûteux, et leur valeur change en cours de session).
-_IDENTITY_CACHE = {"static": None, "mtime": 0.0}
+# même le premier appel LLM.
+# git et système ajoutés au cache le 07/07/2026 avec TTL 60s — avant ils
+# étaient recalculés à CHAQUE appel, ce qui forçait 3 forks (git branch,
+# git log, git status) + 2 lectures /proc à chaque message.
+_IDENTITY_CACHE = {"static": None, "mtime": 0.0, "git": None, "git_ts": 0.0, "sys": None, "sys_ts": 0.0}
+_GIT_TTL = 60.0  # secondes avant de re-scanner git
+_SYS_TTL = 60.0  # secondes avant de re-scanner /proc
 
 
 def _static_mtime() -> float:
@@ -273,22 +277,33 @@ def _build_identity_static() -> dict:
         "tests": scan_tests(),
     }
 
-
 def build_identity() -> dict:
     """Construit la carte d'identité complète de Santana.
 
     Les scans de fichiers sont mis en cache et reconstruits seulement si le
-    code a changé depuis (mtime) — git et système restent recalculés à
-    chaque appel."""
+    code a changé depuis (mtime). git et système ont leur propre TTL de 60s
+    car ils changent plus souvent (git status, /proc/meminfo) mais pas assez
+    pour justifier un appel à chaque message (3 forks + 2 lectures /proc).
+    """
     global _IDENTITY_CACHE
+    import time as _time
+    now = _time.time()
     latest_mtime = _static_mtime()
     if _IDENTITY_CACHE["static"] is None or latest_mtime > _IDENTITY_CACHE["mtime"]:
         _IDENTITY_CACHE["static"] = _build_identity_static()
         _IDENTITY_CACHE["mtime"] = latest_mtime
     identity = dict(_IDENTITY_CACHE["static"])
     identity["horodatage"] = datetime.now().isoformat()
-    identity["git"] = scan_git()
-    identity["systeme"] = scan_system()
+    # Git avec TTL 60s
+    if _IDENTITY_CACHE["git"] is None or now - _IDENTITY_CACHE["git_ts"] > _GIT_TTL:
+        _IDENTITY_CACHE["git"] = scan_git()
+        _IDENTITY_CACHE["git_ts"] = now
+    identity["git"] = _IDENTITY_CACHE["git"]
+    # Système avec TTL 60s
+    if _IDENTITY_CACHE["sys"] is None or now - _IDENTITY_CACHE["sys_ts"] > _SYS_TTL:
+        _IDENTITY_CACHE["sys"] = scan_system()
+        _IDENTITY_CACHE["sys_ts"] = now
+    identity["systeme"] = _IDENTITY_CACHE["sys"]
     return identity
 
 

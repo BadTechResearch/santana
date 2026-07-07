@@ -24,6 +24,19 @@ DB_PATH = os.path.join(BASE_DIR, "memory.db")
 MAX_VIVANTE_BYTES = 12_000   # 12 KB (était 16_000) — bon compromis qualité/vitesse
 TOP_K = 5                     # chunks de livres (était 10)
 
+# Cache pour build_memoire_vivante — évite embeddings + SQLite à chaque message
+# Sans cache : ~500-2000ms par message (embeddings + scan registres + livres)
+# Avec cache TTL 60s : ~0.1ms sur cache hit
+_MEMOIRE_CACHE = {"result": None, "ts": 0.0}
+_MEMOIRE_TTL = 60.0
+
+
+def _invalidate_memoire_cache():
+    """Force le recalcul au prochain appel (après écriture mémoire)."""
+    global _MEMOIRE_CACHE
+    _MEMOIRE_CACHE["result"] = None
+    _MEMOIRE_CACHE["ts"] = 0.0
+
 
 def _read_file(path: str) -> str:
     try:
@@ -140,13 +153,15 @@ def build_memoire_vivante(query: str = "", top_k: int = TOP_K) -> str:
        - Sinon → fallback tronqué (1600 chars/livre)
     4. Applique la limite 20 KB
 
-    Args:
-        query: Dernier message de l'utilisateur (pour recherche vectorielle)
-        top_k: Nombre de chunks de livres à inclure (défaut: 10)
-
-    Returns:
-        Texte formaté pour injection dans le system prompt, ou "" si vide.
+    Cache TTL 60s : évite de recalculer les embeddings à chaque message.
+    Sans cache : ~500-2000ms. Avec cache : ~0.1ms.
     """
+    global _MEMOIRE_CACHE
+    import time as _time
+    _now = _time.time()
+    if _MEMOIRE_CACHE["result"] is not None and _now - _MEMOIRE_CACHE["ts"] < _MEMOIRE_TTL:
+        return _MEMOIRE_CACHE["result"]
+
     parts = []
 
     # 1. Registres (priorité haute — stable, toujours inclus en premier)
@@ -193,6 +208,9 @@ def build_memoire_vivante(query: str = "", top_k: int = TOP_K) -> str:
             result = result[:last_nl]
         result += "\n\n[...tronqué à 16 KB...]"
 
+    # Mettre en cache pour 60s
+    _MEMOIRE_CACHE["result"] = result
+    _MEMOIRE_CACHE["ts"] = _time.time()
     return result
 
 

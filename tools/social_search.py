@@ -23,6 +23,26 @@ import urllib.request
 import re
 import xml.etree.ElementTree as ET
 from typing import Optional
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+
+# Timeout pour les appels Xpoz SDK (les 44s viennent de là)
+_XPOZ_TIMEOUT = 10  # secondes max par appel Xpoz
+_XPOZ_EXECUTOR = ThreadPoolExecutor(max_workers=1)
+
+
+def _xpoz_call_with_timeout(fn, *args, **kwargs):
+    """Wrappe un appel Xpoz SDK avec timeout explicite.
+    Sans ça, un appel bloquant peut prendre 44+ secondes (voir metrics.db).
+    """
+    future = _XPOZ_EXECUTOR.submit(fn, *args, **kwargs)
+    try:
+        return future.result(timeout=_XPOZ_TIMEOUT)
+    except FuturesTimeout:
+        logging.warning(f"[SOCIAL] Timeout {_XPOZ_TIMEOUT}s sur appel Xpoz {fn.__name__}")
+        return None
+    except Exception as e:
+        logging.warning(f"[SOCIAL] Xpoz {fn.__name__} échec: {e}")
+        return None
 
 # ─── Xpoz SDK ─────────────────────────────────────────────────────────────
 
@@ -62,11 +82,13 @@ def _init_xpoz() -> bool:
 
 
 def _xpoz_search_twitter(query: str, limit: int = 10) -> Optional[list]:
-    """Recherche Twitter via Xpoz SDK. Retourne None si indisponible."""
+    """Recherche Twitter via Xpoz SDK. Timeout 10s. Retourne None si indisponible."""
     if not _init_xpoz():
         return None
     try:
-        results = _XPOZ_CLIENT.twitter.search_posts(query, limit=limit)
+        results = _xpoz_call_with_timeout(_XPOZ_CLIENT.twitter.search_posts, query, limit=limit)
+        if results is None:
+            return None
         posts = []
         for p in results.data:
             posts.append({
@@ -89,16 +111,18 @@ def _xpoz_search_twitter(query: str, limit: int = 10) -> Optional[list]:
 
 
 def _xpoz_search_reddit(query: str, subreddit: str = "", limit: int = 10) -> Optional[list]:
-    """Recherche Reddit via Xpoz SDK. Retourne None si indisponible."""
+    """Recherche Reddit via Xpoz SDK. Timeout 10s. Retourne None si indisponible."""
     if not _init_xpoz():
         return None
     try:
         if subreddit:
-            results = _XPOZ_CLIENT.reddit.search_posts(
-                query, subreddit=subreddit, limit=limit
+            results = _xpoz_call_with_timeout(
+                _XPOZ_CLIENT.reddit.search_posts, query, subreddit=subreddit, limit=limit
             )
         else:
-            results = _XPOZ_CLIENT.reddit.search_posts(query, limit=limit)
+            results = _xpoz_call_with_timeout(_XPOZ_CLIENT.reddit.search_posts, query, limit=limit)
+        if results is None:
+            return None
         posts = []
         for p in results.data:
             posts.append({
@@ -120,13 +144,15 @@ def _xpoz_search_reddit(query: str, subreddit: str = "", limit: int = 10) -> Opt
 
 
 def _xpoz_search_instagram(query: str, limit: int = 10) -> Optional[list]:
-    """Recherche Instagram via Xpoz SDK. Retourne None si indisponible.
+    """Recherche Instagram via Xpoz SDK. Timeout 10s. Retourne None si indisponible.
     Note : Instagram coûte 12 crédits/req — utiliser avec parcimonie.
     """
     if not _init_xpoz():
         return None
     try:
-        results = _XPOZ_CLIENT.instagram.search_posts(query, limit=limit)
+        results = _xpoz_call_with_timeout(_XPOZ_CLIENT.instagram.search_posts, query, limit=limit)
+        if results is None:
+            return None
         posts = []
         for p in results.data:
             posts.append({
@@ -147,11 +173,13 @@ def _xpoz_search_instagram(query: str, limit: int = 10) -> Optional[list]:
 
 
 def _xpoz_search_tiktok(query: str, limit: int = 10) -> Optional[list]:
-    """Recherche TikTok via Xpoz SDK. Retourne None si indisponible."""
+    """Recherche TikTok via Xpoz SDK. Timeout 10s. Retourne None si indisponible."""
     if not _init_xpoz():
         return None
     try:
-        results = _XPOZ_CLIENT.tiktok.search_posts(query, limit=limit)
+        results = _xpoz_call_with_timeout(_XPOZ_CLIENT.tiktok.search_posts, query, limit=limit)
+        if results is None:
+            return None
         posts = []
         for p in results.data:
             posts.append({
