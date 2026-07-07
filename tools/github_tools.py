@@ -51,8 +51,8 @@ def _get_token() -> str:
         with open(_ENV_FILE) as f:
             for line in f:
                 line = line.strip()
-                if line.startswith("GITHUB_TOKEN="):
-                    # Valeur: GITHUB_TOKEN="ghp_xxx" ou GITHUB_TOKEN=ghp_xxx
+                # Formats: GITHUB_TOKEN="xxx" ou export GITHUB_TOKEN='xxx'
+                if line.replace("export ", "").startswith("GITHUB_TOKEN="):
                     raw = line.split("=", 1)[1]
                     raw = raw.strip("\"'")
                     return raw
