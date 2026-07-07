@@ -18,6 +18,7 @@ SOUL_DIR = os.path.join(BASE_DIR, "soul")
 # une fois puis réutilisé tant que les fichiers soul/ ne changent pas.
 _PROMPT_CACHE = {"base": None, "soul_mtime": 0}
 _SOUL_CACHE = {}
+_PROFILE_CACHE = {"content": None, "mtime": 0}
 
 # Liste canonique des fichiers soul/ effectivement utilisés par le prompt
 # système (voir _build_prompt_base ci-dessous). Source unique de vérité :
@@ -142,9 +143,10 @@ def get_prompt_base() -> str:
 
 def invalidate_prompt_cache():
     """Invalide TOUS les caches. À appeler sur /reset ou si soul/*.md change."""
-    global _PROMPT_CACHE, _SOUL_CACHE
+    global _PROMPT_CACHE, _SOUL_CACHE, _PROFILE_CACHE
     _PROMPT_CACHE["base"] = None
     _SOUL_CACHE.clear()
+    _PROFILE_CACHE = {"content": None, "mtime": 0}
 
 
 # ─── Messages sociaux (pas de mémoire nécessaire) ──────────────────────────────
@@ -281,13 +283,20 @@ def build_system_prompt(user_message: str = "", msg_type: str = None) -> str:
         msg_type = classify_message(user_message)
     prompt += "\n" + get_routing_intent(msg_type, user_message) + "\n"
 
-    # Profil utilisateur injecté (Phase 1 — P1)
+    # Profil utilisateur injecté avec cache TTL 300s (P2 — pas de read disque à chaque message)
     try:
+        global _PROFILE_CACHE
         import os as _os
         _pf = _os.path.join(get_base_dir(), "skills/profile-serge.md")
-        if _os.path.exists(_pf):
+        now_mtime = _os.path.getmtime(_pf) if _os.path.exists(_pf) else 0
+        if _PROFILE_CACHE["content"] and now_mtime <= _PROFILE_CACHE["mtime"]:
+            _profile = _PROFILE_CACHE["content"]
+        else:
             with open(_pf) as _f:
                 _profile = _f.read()
+            _PROFILE_CACHE["content"] = _profile
+            _PROFILE_CACHE["mtime"] = now_mtime
+        if _profile:
             prompt += "\n### PROFIL UTILISATEUR\n" + _profile + "\n"
     except Exception as _pe:
         logging.debug("[SYSTEM] Profile inject error: %s", _pe)

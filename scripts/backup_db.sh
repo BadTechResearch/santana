@@ -11,14 +11,13 @@ SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
 BACKUP_DIR="_backups"
-RETENTION_DAYS=7
+RETENTION_DAYS=3
 TIMESTAMP=$(date +%Y-%m-%dT%H%M%S)
 
 # Bases de données à backup
 DATABASES=(
     "memory.db:memory"
     "metrics.db:metrics"
-    "accounts.db:accounts"
 )
 
 # ── Alerte Telegram ──────────────────────────────────────────────────────────
@@ -71,7 +70,7 @@ list_backups() {
         echo "  Aucun backup"
         return
     fi
-    for db in memory metrics accounts; do
+    for db in memory metrics; do
         echo ""
         echo "  📁 $db :"
         ls -1tr "$BACKUP_DIR/${db}_"*.db 2>/dev/null | while read -r f; do
