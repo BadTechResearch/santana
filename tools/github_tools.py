@@ -498,6 +498,21 @@ def tool_github_create_pr(repo: str, head: str, title: str, body: str = "", base
         return f"❌ Erreur création PR: {e}"
 
 
+def _api_put(path: str, data: dict) -> dict:
+    """Requête PUT vers l'API GitHub."""
+    url = f"{GITHUB_API}{path}"
+    body = json.dumps(data).encode()
+    req = urllib.request.Request(url, data=body, headers=_api_headers(), method="PUT")
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode()[:500]
+        raise RuntimeError(f"GitHub API PUT {path} → {e.code}: {err_body}")
+    except Exception as e:
+        raise RuntimeError(f"GitHub API PUT {path} → {e}")
+
+
 @track()
 def tool_github_merge_pr(repo: str, pull_number: int, commit_title: str = "") -> str:
     """Merge une Pull Request.
@@ -520,24 +535,6 @@ def tool_github_merge_pr(repo: str, pull_number: int, commit_title: str = "") ->
         if "Merge conflict" in str(e):
             return f"❌ Conflit de merge sur PR #{pull_number} — intervention manuelle nécessaire."
         return f"❌ Erreur merge PR: {e}"
-
-
-_ = _api_put  # défini plus bas pour l'ordre
-
-
-def _api_put(path: str, data: dict) -> dict:
-    """Requête PUT vers l'API GitHub."""
-    url = f"{GITHUB_API}{path}"
-    body = json.dumps(data).encode()
-    req = urllib.request.Request(url, data=body, headers=_api_headers(), method="PUT")
-    try:
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            return json.loads(resp.read().decode())
-    except urllib.error.HTTPError as e:
-        err_body = e.read().decode()[:500]
-        raise RuntimeError(f"GitHub API PUT {path} → {e.code}: {err_body}")
-    except Exception as e:
-        raise RuntimeError(f"GitHub API PUT {path} → {e}")
 
 
 # ── Registre Santana ───────────────────────────────────────────────────────
