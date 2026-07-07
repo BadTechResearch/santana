@@ -50,6 +50,94 @@ def _init_providers():
         })
 
 
+def _truncate_messages(messages: list, provider_name: str, max_payload_chars: int = None) -> list:
+    """Compresse les messages pour les providers avec limite de payload.
+
+    DeepSeek gère 1M tokens → pas de troncature.
+    Groq/autres ont des limites HTTP plus basses → on réduit.
+
+    Stratégie :
+    - Garder le(s) message(s) system (prompt)
+    - Garder le dernier message user ET le dernier assistant
+    - Résumer les tool results trop longs (garder 500 premiers + 500 derniers chars)
+    - Limiter le nombre total de messages à (system + N derniers tours)
+    """
+    if provider_name == "deepseek":
+        return messages  # DeepSeek gère 1M tokens, pas de limite payload
+
+    max_chars = max_payload_chars or 4_000_000  # ~4MB brut = safe pour Groq
+
+    # Compter la taille actuelle
+    current_size = len(json.dumps(messages, ensure_ascii=False))
+    if current_size <= max_chars:
+        return messages
+
+    logger.warning("[TRUNCATE] Payload %d chars > %d pour %s — compression",
+                   current_size, max_chars, provider_name)
+
+    # Séparer system et conversation
+    system_msgs = [m for m in messages if m.get("role") == "system"]
+    other_msgs = [m for m in messages if m.get("role") != "system"]
+
+    if not other_msgs:
+        # Impossible de tronquer plus
+        return messages
+
+    # Garder : système + dernier user + dernier assistant + dernier tool (si présent)
+    last_user = None
+    last_assistant = None
+    last_tool = None
+
+    for m in reversed(other_msgs):
+        role = m.get("role")
+        if role == "user" and last_user is None:
+            last_user = m
+        elif role == "assistant" and last_assistant is None:
+            last_assistant = m
+        elif role == "tool" and last_tool is None:
+            last_tool = m
+        if last_user and last_assistant:
+            break
+
+    truncated = list(system_msgs)
+    if last_user:
+        truncated.append(last_user)
+    if last_assistant:
+        truncated.append(last_assistant)
+    if last_tool:
+        truncated.append(last_tool)
+
+    # Tronquer les contenus tool trop longs
+    for m in truncated:
+        if m.get("role") == "tool" and m.get("content"):
+            content = str(m["content"])
+            if len(content) > 2000:
+                m["content"] = content[:1000] + "\n[... tronqué par fallback ...]\n" + content[-500:]
+
+    new_size = len(json.dumps(truncated, ensure_ascii=False))
+    logger.info("[TRUNCATE] Messages comprimés: %d → %d messages, %d → %d chars",
+                len(messages), len(truncated), current_size, new_size)
+    return truncated
+
+
+def _check_env_on_start() -> dict:
+    """Vérifie les clés API au démarrage et logue les problèmes."""
+    env = _get_env()
+    status = {}
+    for name, key_field, model_field in [
+        ("deepseek", "deepseek_key", "deepseek_model"),
+        ("openrouter", "openrouter_key", "openrouter_model"),
+        ("groq", "groq_key", "groq_model"),
+    ]:
+        key = env.get(key_field, "")
+        model = env.get(model_field, "inconnu")
+        if key:
+            status[name] = {"ok": True, "model": model, "key_prefix": key[:7] + "..."}
+        else:
+            status[name] = {"ok": False, "model": model}
+    return status
+
+
 def _get_env():
     return {
         "openrouter_key": os.getenv('OPENROUTER_API_KEY', '').strip(),
@@ -78,8 +166,9 @@ def complete(messages, model=None, max_tokens=32000, tools=None, tool_choice='au
     last_error = None
     for provider in PROVIDER_CHAIN:
         try:
+            truncated = _truncate_messages(messages, provider["name"])
             return _provider_complete(
-                provider, messages,
+                provider, truncated,
                 model or provider["model"],
                 max_tokens, tools, tool_choice, timeout,
             )
@@ -147,10 +236,11 @@ def complete_stream(messages, model=None, max_tokens=32000, tools=None, tool_cho
     last_error = None
     for provider in PROVIDER_CHAIN:
         try:
+            truncated = _truncate_messages(messages, provider["name"])
             headers = _provider_headers(provider)
             body = {
                 "model": model or provider["model"],
-                "messages": messages,
+                "messages": truncated,
                 "max_tokens": max_tokens,
                 "stream": True,
             }
