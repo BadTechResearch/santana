@@ -1,10 +1,9 @@
-"""Provider LLM pour Santana — DeepSeek natif, OpenRouter fallback, Groq gratuit."""
+"""Provider LLM pour Santana — DeepSeek principal, Groq fallback unique."""
 import json, logging, os, requests, time
 from typing import Generator
 
 logger = logging.getLogger(__name__)
 
-OPENROUTER_URL = "https://openrouter.ai/api/v1"
 DEEPSEEK_URL = "https://api.deepseek.com/v1"
 GROQ_URL = "https://api.groq.com/openai/v1"
 
@@ -22,7 +21,7 @@ def _init_providers():
     PROVIDER_CHAIN = []
     env = _get_env()
 
-    # 1. DeepSeek DIRECT — provider principal
+    # 1. DeepSeek — provider principal
     if env.get("deepseek_key"):
         PROVIDER_CHAIN.append({
             "name": "deepseek",
@@ -31,16 +30,7 @@ def _init_providers():
             "model": env.get("deepseek_model", "deepseek-v4-flash"),
         })
 
-    # 2. OpenRouter — fallback (DeepSeek V4 Flash)
-    if env.get("openrouter_key"):
-        PROVIDER_CHAIN.append({
-            "name": "openrouter",
-            "key": env["openrouter_key"],
-            "url": OPENROUTER_URL,
-            "model": env.get("openrouter_model", "deepseek/deepseek-v4-flash"),
-        })
-
-    # 3. Groq — fallback gratuit (Llama 3.3 70B)
+    # 2. Groq — fallback unique
     if env.get("groq_key"):
         PROVIDER_CHAIN.append({
             "name": "groq",
@@ -126,7 +116,6 @@ def _check_env_on_start() -> dict:
     status = {}
     for name, key_field, model_field in [
         ("deepseek", "deepseek_key", "deepseek_model"),
-        ("openrouter", "openrouter_key", "openrouter_model"),
         ("groq", "groq_key", "groq_model"),
     ]:
         key = env.get(key_field, "")
@@ -140,12 +129,10 @@ def _check_env_on_start() -> dict:
 
 def _get_env():
     return {
-        "openrouter_key": os.getenv('OPENROUTER_API_KEY', '').strip(),
-        "openrouter_model": os.getenv('OPENROUTER_MODEL', 'deepseek/deepseek-v4-flash').strip(),
-        "groq_key": os.getenv('GROQ_API_KEY', '').strip(),
-        "groq_model": os.getenv('GROQ_MODEL', 'llama-3.3-70b-versatile').strip(),
         "deepseek_key": os.getenv('DEEPSEEK_API_KEY', '').strip(),
         "deepseek_model": os.getenv('DEEPSEEK_MODEL', 'deepseek-v4-flash').strip(),
+        "groq_key": os.getenv('GROQ_API_KEY', '').strip(),
+        "groq_model": os.getenv('GROQ_MODEL', 'llama-3.3-70b-versatile').strip(),
     }
 
 
