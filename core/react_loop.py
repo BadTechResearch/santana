@@ -148,28 +148,46 @@ def _run_eval(resp: str, msg: str):
 # inutiles (ex: github_list_files sur une question d'actualité).
 # On ne présente au LLM que les outils pertinents pour le type de message.
 _TOOL_CATEGORIES = {
-    # Recherche & informations
-    "search": {"web_search", "web_navigate", "get_datetime",
-               "social_search", "web_screenshot", "youtube_info"},
-    # Mémoire & skills
-    "memory": {"memory_query", "atlas", "self_inspect", "search_skills"},
-    # Exécution de code / shell
-    "code": {"vm_exec", "vm_exec_script", "run_code", "workspace_state", "tmux_session"},
-    # GitHub (rarement utile hors code explicite)
+    # Recherche & informations publiques
+    "search": {"web_search", "web_navigate", "web_screenshot",
+               "get_datetime", "youtube_info", "read_pdf"},
+    # Réseaux sociaux (recherche par mots-clés)
+    "social_search": {"social_search", "social_news", "social_browser",
+                      "twitter_search", "reddit_search",
+                      "instagram_search", "tiktok_search"},
+    # Réseaux sociaux (lookup par compte spécifique)
+    "social_lookup": {"twitter_lookup", "reddit_lookup",
+                      "instagram_lookup", "tiktok_lookup"},
+    # Mémoire personnelle & skills
+    "memory": {"memory_query", "atlas", "self_inspect",
+               "search_skills", "skill_view", "skill_list", "skill_manage"},
+    # Code / exécution
+    "code": {"run_code", "code_modify", "code_list_sources", "restart_self",
+             "workspace_state", "tmux_session"},
+    # GitHub
     "github": {"github_list_repos", "github_list_files",
                "github_read", "github_write"},
-    # Meta / Skills / Preview
-    "meta": {"save_skill", "render_preview", "fs_write"},
-    # Orchestration (catégorie supprimée le 20 juin 2026 — tous les outils
-    # étaient morts depuis la suppression des wrappers *_ops.py)
+    # Meta — édition, skills, délégation, preview
+    "meta": {"save_skill", "render_preview", "fs_write", "fs_read",
+             "delegate_task", "cost_governor"},
+    # Admin — outils dynamiques créés par le LLM (rares)
+    "admin": {"tool_create", "install_dependencies",
+              "list_user_tools", "delete_user_tool"},
 }
 # Catégories autorisées par type de message
 _TOOLS_BY_TYPE = {
-    "FACTUEL":  ["search", "memory"],
-    "SYNTHESE": ["search", "memory"],
-    "DEEP":     ["search", "memory", "code", "meta"],
-    "PERSONNEL": ["search", "memory", "code", "meta", "github"],
-    "SOCIAL": [],
+    # Questions factuelles → recherche + mémoire seulement
+    "FACTUEL":   ["search", "memory"],
+    # Synthèse → recherche + mémoire
+    "SYNTHESE":  ["search", "memory"],
+    # Analyse approfondie → recherche + social + code + meta
+    "DEEP":      ["search", "social_search", "social_lookup",
+                  "memory", "code", "meta"],
+    # Personnel → tout sauf admin
+    "PERSONNEL": ["search", "social_search", "social_lookup",
+                  "memory", "code", "github", "meta"],
+    # Salutations → pas d'outils du tout
+    "SOCIAL":    [],
 }
 
 # Cache prompt supprimé (v1.1) : build_system_prompt reconstruit

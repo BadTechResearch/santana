@@ -185,6 +185,9 @@ class TelegramStream:
         self._on_first_content = None
         self._has_sent_content = False
         self._show_cursor = True
+        # Backoff exponentiel sur flood 429
+        self._retry_count = 0
+        self._retry_delay = 0.5  # secondes, doublé à chaque 429
 
     def set_on_first_content(self, callback):
         """Enregistre une coroutine à exécuter dès le premier contenu réel
@@ -244,10 +247,12 @@ class TelegramStream:
             if self._progress_msg:
                 shown += "\n\n⏳ " + self._progress_msg
             if len(shown) > _MAX_MSG_LEN:
-                # Afficher le DÉBUT (pas la fin) : sur une réponse longue,
-                # l'utilisateur doit voir le texte qui s'écrit dans l'ordre.
+                # Afficher la FIN du buffer (pas le début) : pendant le streaming,
+                # l'utilisateur doit voir le texte qui s'écrit EN DIRECT, pas le
+                # début déjà lu. Le prepend "...(+N)" indique le contenu caché.
                 remaining = len(shown) - (_MAX_MSG_LEN - 40)
-                shown = shown[:_MAX_MSG_LEN - 40] + f"\n\n… *(+{remaining} caractères)*"
+                header = f"\n\n… (+{remaining} caractères)\n\n"
+                shown = header + shown[-(_MAX_MSG_LEN - 40):]
             if not shown.strip():
                 return
             # Curseur clignotant : présent pendant le streaming, retiré
@@ -272,7 +277,19 @@ class TelegramStream:
                         text=html, parse_mode="HTML",
                     )
                 self._last_edit_ts = time.time()
+                # Succès → reset backoff
+                self._retry_count = 0
+                self._retry_delay = 0.5
             except Exception as e:
+                err_str = str(e).lower()
+                # Flood 429 → backoff exponentiel (reporte la prochaine édition)
+                if "429" in err_str or "too many requests" in err_str or "flood" in err_str:
+                    self._retry_count += 1
+                    self._retry_delay = min(0.5 * (2 ** self._retry_count), 10.0)  # max 10s
+                    self._last_edit_ts = time.time() + self._retry_delay  # saute le prochain intervalle aussi
+                    logger.warning("[TG_STREAM] Flood 429, backoff %.1fs (tentative %d)",
+                                   self._retry_delay, self._retry_count)
+                    return
                 # "Message is not modified" et les 429 ponctuels ne sont pas fatals —
                 # le prochain chunk ou finalize() rattrapera l'affichage.
                 # Si le HTML a échoué (tags mal formés), retenter en texte brut.
