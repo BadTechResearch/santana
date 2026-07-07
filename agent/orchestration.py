@@ -10,7 +10,7 @@ tous morts. Gardé : record_tool_result, tenter_reparation,
 get_failure_status et leurs helpers.)
 """
 
-import json
+import os, json
 import logging
 import sqlite3
 import subprocess

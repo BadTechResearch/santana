@@ -1,8 +1,16 @@
-"""Provider LLM pour Santana — DeepSeek principal, Groq fallback unique."""
+"""Provider LLM pour Santana — DeepSeek principal, Groq fallback unique.
+
+Chaîne de fallback : DeepSeek (retry ×2) → Groq.
+Le passage d'un provider à l'autre est notifié au provider_manager
+qui maintient l'état global (tag réponse, config dynamique).
+"""
+
 import json, logging, os, requests, time
 from typing import Generator
 
 logger = logging.getLogger(__name__)
+
+from core import provider_manager as pm
 
 DEEPSEEK_URL = "https://api.deepseek.com/v1"
 GROQ_URL = "https://api.groq.com/openai/v1"
@@ -40,22 +48,22 @@ def _init_providers():
         })
 
 
-def _truncate_messages(messages: list, provider_name: str, max_payload_chars: int = None) -> list:
-    """Compresse les messages pour les providers avec limite de payload.
+def _truncate_messages(messages: list, provider_name: str) -> list:
+    """Compresse les messages selon le provider actif.
 
     DeepSeek gère 1M tokens → pas de troncature.
-    Groq/autres ont des limites HTTP plus basses → on réduit.
+    Groq a ~128K tokens de contexte → troncature agressive.
 
     Stratégie :
     - Garder le(s) message(s) system (prompt)
     - Garder le dernier message user ET le dernier assistant
-    - Résumer les tool results trop longs (garder 500 premiers + 500 derniers chars)
-    - Limiter le nombre total de messages à (system + N derniers tours)
+    - Résumer les tool results trop longs
     """
+    config = pm.get_provider_config(provider_name)
+    max_chars = config["max_payload_chars"]
+
     if provider_name == "deepseek":
         return messages  # DeepSeek gère 1M tokens, pas de limite payload
-
-    max_chars = max_payload_chars or 4_000_000  # ~4MB brut = safe pour Groq
 
     # Compter la taille actuelle
     current_size = len(json.dumps(messages, ensure_ascii=False))
@@ -70,7 +78,6 @@ def _truncate_messages(messages: list, provider_name: str, max_payload_chars: in
     other_msgs = [m for m in messages if m.get("role") != "system"]
 
     if not other_msgs:
-        # Impossible de tronquer plus
         return messages
 
     # Garder : système + dernier user + dernier assistant + dernier tool (si présent)
@@ -104,7 +111,24 @@ def _truncate_messages(messages: list, provider_name: str, max_payload_chars: in
             if len(content) > 2000:
                 m["content"] = content[:1000] + "\n[... tronqué par fallback ...]\n" + content[-500:]
 
+    # Si encore trop gros : tronquer le system prompt aussi (Groq)
     new_size = len(json.dumps(truncated, ensure_ascii=False))
+    if new_size > max_chars:
+        for m in truncated:
+            if m.get("role") == "system" and m.get("content"):
+                content = str(m["content"])
+                if len(content) > 10000:
+                    m["content"] = content[:5000] + "\n[... prompt système tronqué pour Groq ...]\n" + content[-3000:]
+                    break
+        new_size = len(json.dumps(truncated, ensure_ascii=False))
+    # Dernier recours : tronquer TOUS les contenus des messages non-système
+    if new_size > max_chars:
+        for m in truncated:
+            if m.get("role") in ("user", "assistant") and m.get("content"):
+                content = str(m["content"])
+                if len(content) > 5000:
+                    m["content"] = content[:2500] + "\n[... contenu tronqué pour Groq ...]\n" + content[-1500:]
+        new_size = len(json.dumps(truncated, ensure_ascii=False))
     logger.info("[TRUNCATE] Messages comprimés: %d → %d messages, %d → %d chars",
                 len(messages), len(truncated), current_size, new_size)
     return truncated
@@ -143,6 +167,63 @@ def _provider_headers(provider: dict) -> dict:
     }
 
 
+def _call_with_retry(provider: dict, fn, *args, **kwargs):
+    """Appelle 'fn' pour ce provider avec retry exponentiel.
+
+    DeepSeek : jusqu'à 2 retries avant d'abandonner (transient 401/429).
+    Groq : 1 retry rapide.
+    """
+    config = pm.get_provider_config(provider["name"])
+    max_attempts = 1 + config["retry_count"]  # 1 vrai appel + N retry
+    delay = config["retry_delay"]
+
+    last_error = None
+    for attempt in range(max_attempts):
+        try:
+            result = fn(*args, **kwargs)
+            # Succès → notifier le manager
+            if provider["name"] == "deepseek":
+                pm.set_active_provider("deepseek")
+                pm.record_deepseek_success()
+            else:
+                pm.set_active_provider("groq")
+            return result
+        except requests.exceptions.HTTPError as e:
+            last_error = e
+            status = e.response.status_code if e.response else 0
+            # 401 (auth) ou 403 (forbidden) → inutile de retenter
+            if status in (401, 403):
+                logger.warning("[RETRY] %s HTTP %d — non récupérable, fallback immédiat",
+                               provider['name'], status)
+                pm.set_active_provider("groq" if provider["name"] == "deepseek" else "deepseek")
+                break
+            # 429 (rate limit) ou 5xx (server error) → retry pertinent
+            if attempt < max_attempts - 1:
+                logger.warning("[RETRY] %s HTTP %d — tentative %d/%d dans %.1fs",
+                               provider['name'], status, attempt + 1, max_attempts, delay)
+                time.sleep(delay)
+                delay *= 2  # exponentiel
+            else:
+                logger.warning("[RETRY] %s: toutes les %d tentatives épuisées, fallback",
+                               provider['name'], max_attempts)
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+            last_error = e
+            if attempt < max_attempts - 1:
+                logger.warning("[RETRY] %s timeout/connection — tentative %d/%d dans %.1fs",
+                               provider['name'], attempt + 1, max_attempts, delay)
+                time.sleep(delay)
+                delay *= 2
+            else:
+                logger.warning("[RETRY] %s: timeout épuisé après %d tentatives, fallback",
+                               provider['name'], max_attempts)
+        except Exception as e:
+            last_error = e
+            logger.warning("[RETRY] %s: erreur inattendue: %s", provider['name'], e)
+            break  # erreur inconnue → fallback immédiat
+
+    raise last_error or RuntimeError(f"{provider['name']} indisponible")
+
+
 def complete(messages, model=None, max_tokens=32000, tools=None, tool_choice='auto', timeout=120):
     """Appel LLM bloquant — fallback sur chaque provider jusqu'au premier succès."""
     if not PROVIDER_CHAIN:
@@ -154,10 +235,14 @@ def complete(messages, model=None, max_tokens=32000, tools=None, tool_choice='au
     for provider in PROVIDER_CHAIN:
         try:
             truncated = _truncate_messages(messages, provider["name"])
-            return _provider_complete(
+            # Utiliser le max_tokens adapté au provider si pas d'override
+            p_config = pm.get_provider_config(provider["name"])
+            p_max_tokens = min(max_tokens, p_config["max_tokens"]) if max_tokens == 32000 else max_tokens
+            return _call_with_retry(
+                provider, _provider_complete,
                 provider, truncated,
                 model or provider["model"],
-                max_tokens, tools, tool_choice, timeout,
+                p_max_tokens, tools, tool_choice, timeout,
             )
         except Exception as e:
             last_error = e
@@ -222,114 +307,154 @@ def complete_stream(messages, model=None, max_tokens=32000, tools=None, tool_cho
 
     last_error = None
     for provider in PROVIDER_CHAIN:
-        try:
-            truncated = _truncate_messages(messages, provider["name"])
-            headers = _provider_headers(provider)
-            body = {
-                "model": model or provider["model"],
-                "messages": truncated,
-                "max_tokens": max_tokens,
-                "stream": True,
-            }
-            if tools:
-                body["tools"] = tools
-                body["tool_choice"] = tool_choice
+        # Retry loop interne pour ce provider (DeepSeek: ×3, Groq: ×2)
+        p_config = pm.get_provider_config(provider["name"])
+        max_attempts = 1 + p_config["retry_count"]
+        retry_delay = p_config["retry_delay"]
 
-            url = f"{provider['url']}/chat/completions"
-            logger.info(f"[STREAM] Appel {provider['name']}/{body['model']} en streaming")
-
-            with _HTTP_SESSION.post(url, headers=headers, json=body,
-                               timeout=timeout, stream=True) as resp:
-                resp.raise_for_status()
-
-                content = ""
-                reasoning = ""
-                tool_calls_parts = {}
-                finish_reason = "stop"
-
-                for line in resp.iter_lines(decode_unicode=True):
-                    if not line:
-                        continue
-                    if not line.startswith("data: "):
-                        continue
-                    payload = line[6:]
-                    if payload == "[DONE]":
-                        break
-
-                    try:
-                        chunk = json.loads(payload)
-                    except json.JSONDecodeError:
-                        continue
-
-                    choices = chunk.get("choices", [])
-                    if not choices:
-                        continue
-
-                    delta = choices[0].get("delta", {})
-                    f_reason = choices[0].get("finish_reason")
-
-                    if "content" in delta and delta["content"]:
-                        token = delta["content"]
-                        content += token
-                        yield {'type': 'content', 'content': token}
-
-                    if "reasoning_content" in delta and delta["reasoning_content"]:
-                        reasoning += delta["reasoning_content"]
-                    elif "reasoning" in delta and delta["reasoning"]:
-                        reasoning += delta["reasoning"]
-
-                    if "tool_calls" in delta:
-                        for tc in delta["tool_calls"]:
-                            idx = tc.get("index", 0)
-                            if idx not in tool_calls_parts:
-                                tool_calls_parts[idx] = {
-                                    "id": tc.get("id", f"call_{idx}"),
-                                    "name": "",
-                                    "arguments": "",
-                                }
-                            part = tool_calls_parts[idx]
-                            if "id" in tc and tc["id"]:
-                                part["id"] = tc["id"]
-                            if tc.get("function"):
-                                if tc["function"].get("name"):
-                                    part["name"] += tc["function"]["name"]
-                                if tc["function"].get("arguments"):
-                                    part["arguments"] += tc["function"]["arguments"]
-
-                    if f_reason:
-                        finish_reason = f_reason
-
-                tool_calls = None
-                if tool_calls_parts:
-                    tool_calls = []
-                    for idx in sorted(tool_calls_parts.keys()):
-                        part = tool_calls_parts[idx]
-                        tool_calls.append({
-                            "id": part["id"],
-                            "type": "function",
-                            "function": {
-                                "name": part["name"],
-                                "arguments": part["arguments"],
-                            },
-                        })
-
-                logger.info(f"[STREAM] Termine: {len(content)} chars, outils={'oui' if tool_calls else 'non'}")
-                resolved_content = content or reasoning or ""
-                yield {'type': 'complete', 'content': resolved_content,
-                       'finish_reason': finish_reason,
-                       'tool_calls': tool_calls,
-                       'reasoning_content': reasoning or None}
-            return
-
-        except requests.exceptions.HTTPError as e:
-            last_error = e
+        for attempt in range(max_attempts):
             try:
-                logger.warning(f"[STREAM] {provider['name']} HTTP {e.response.status_code}: {e.response.text[:300]}")
-            except Exception:
-                logger.warning(f"[STREAM] {provider['name']} HTTP {e.response.status_code}, fallback...")
-        except Exception as e:
-            last_error = e
-            logger.warning(f"[STREAM] {provider['name']} a echoue: {e}, fallback suivant...")
+                truncated = _truncate_messages(messages, provider["name"])
+                p_max_tokens = min(max_tokens, p_config["max_tokens"]) if max_tokens == 32000 else max_tokens
+                headers = _provider_headers(provider)
+                body = {
+                    "model": model or provider["model"],
+                    "messages": truncated,
+                    "max_tokens": p_max_tokens,
+                    "stream": True,
+                }
+                if tools:
+                    body["tools"] = tools
+                    body["tool_choice"] = tool_choice
+
+                url = f"{provider['url']}/chat/completions"
+                logger.info(f"[STREAM] Appel {provider['name']}/{body['model']} "
+                            f"en streaming (tentative {attempt + 1}/{max_attempts})")
+
+                with _HTTP_SESSION.post(url, headers=headers, json=body,
+                                   timeout=timeout, stream=True) as resp:
+                    resp.raise_for_status()
+
+                    # Succès → notifier le manager
+                    if provider["name"] == "deepseek":
+                        pm.set_active_provider("deepseek")
+                        pm.record_deepseek_success()
+                    else:
+                        pm.set_active_provider("groq")
+
+                    content = ""
+                    reasoning = ""
+                    tool_calls_parts = {}
+                    finish_reason = "stop"
+
+                    for line in resp.iter_lines(decode_unicode=True):
+                        if not line:
+                            continue
+                        if not line.startswith("data: "):
+                            continue
+                        payload = line[6:]
+                        if payload == "[DONE]":
+                            break
+
+                        try:
+                            chunk = json.loads(payload)
+                        except json.JSONDecodeError:
+                            continue
+
+                        choices = chunk.get("choices", [])
+                        if not choices:
+                            continue
+
+                        delta = choices[0].get("delta", {})
+                        f_reason = choices[0].get("finish_reason")
+
+                        if "content" in delta and delta["content"]:
+                            token = delta["content"]
+                            content += token
+                            yield {'type': 'content', 'content': token}
+
+                        if "reasoning_content" in delta and delta["reasoning_content"]:
+                            reasoning += delta["reasoning_content"]
+                        elif "reasoning" in delta and delta["reasoning"]:
+                            reasoning += delta["reasoning"]
+
+                        if "tool_calls" in delta:
+                            for tc in delta["tool_calls"]:
+                                idx = tc.get("index", 0)
+                                if idx not in tool_calls_parts:
+                                    tool_calls_parts[idx] = {
+                                        "id": tc.get("id", f"call_{idx}"),
+                                        "name": "",
+                                        "arguments": "",
+                                    }
+                                part = tool_calls_parts[idx]
+                                if "id" in tc and tc["id"]:
+                                    part["id"] = tc["id"]
+                                if tc.get("function"):
+                                    if tc["function"].get("name"):
+                                        part["name"] += tc["function"]["name"]
+                                    if tc["function"].get("arguments"):
+                                        part["arguments"] += tc["function"]["arguments"]
+
+                        if f_reason:
+                            finish_reason = f_reason
+
+                    tool_calls = None
+                    if tool_calls_parts:
+                        tool_calls = []
+                        for idx in sorted(tool_calls_parts.keys()):
+                            part = tool_calls_parts[idx]
+                            tool_calls.append({
+                                "id": part["id"],
+                                "type": "function",
+                                "function": {
+                                    "name": part["name"],
+                                    "arguments": part["arguments"],
+                                },
+                            })
+
+                    logger.info(f"[STREAM] Termine: {len(content)} chars, outils={'oui' if tool_calls else 'non'}")
+                    resolved_content = content or reasoning or ""
+                    yield {'type': 'complete', 'content': resolved_content,
+                           'finish_reason': finish_reason,
+                           'tool_calls': tool_calls,
+                           'reasoning_content': reasoning or None}
+                return  # succès → sortir du provider loop
+
+            except requests.exceptions.HTTPError as e:
+                last_error = e
+                status = e.response.status_code if e.response else 0
+                try:
+                    logger.warning(f"[STREAM] {provider['name']} HTTP {status}: {e.response.text[:200]}")
+                except Exception:
+                    logger.warning(f"[STREAM] {provider['name']} HTTP {status}")
+                # 401/403 → inutile de retenter
+                if status in (401, 403):
+                    pm.set_active_provider("groq" if provider["name"] == "deepseek" else "deepseek")
+                    break  # sortir du retry loop, passer au provider suivant
+                # 429/5xx → retry pertinent
+                if attempt < max_attempts - 1:
+                    logger.warning("[STREAM-RETRY] %s tentative %d/%d dans %.1fs",
+                                   provider['name'], attempt + 1, max_attempts, retry_delay)
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                else:
+                    logger.warning("[STREAM-RETRY] %s: toutes les %d tentatives épuisées",
+                                   provider['name'], max_attempts)
+            except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as e:
+                last_error = e
+                if attempt < max_attempts - 1:
+                    logger.warning("[STREAM-RETRY] %s timeout — tentative %d/%d dans %.1fs",
+                                   provider['name'], attempt + 1, max_attempts, retry_delay)
+                    time.sleep(retry_delay)
+                    retry_delay *= 2
+                else:
+                    logger.warning("[STREAM-RETRY] %s: timeout épuisé après %d tentatives",
+                                   provider['name'], max_attempts)
+            except Exception as e:
+                last_error = e
+                logger.warning(f"[STREAM] {provider['name']} a echoue: {e}")
+                break  # erreur inconnue → sortir, prochain provider
 
     if last_error:
         yield {'type': 'error', 'content': f'LLM: {last_error}'}

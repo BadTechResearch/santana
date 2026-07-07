@@ -52,9 +52,13 @@ def pulse(response: str, user_message: str, tools_used: list) -> None:
     """Enregistre le pouls après chaque réponse. 3 métriques max."""
     now = datetime.now().isoformat()
     state = _load_state()
-    state["total_responses"] = state.get("total_responses", 0) + 1
+    # Migrer l'ancien format (dict) → int si nécessaire
+    old_count = state.get("tools_count", 0)
+    if isinstance(old_count, dict):
+        old_count = sum(old_count.values()) if old_count else 0
+    state["total_responses"] = (state.get("total_responses") or 0) + 1
     state["last_activity"] = now
-    state["tools_count"] = state.get("tools_count", 0) + len(tools_used)
+    state["tools_count"] = old_count + len(tools_used or [])
 
     log = state.setdefault("interaction_log", [])
     log.append({

@@ -18,6 +18,7 @@ from agent.context import push_exchange, maybe_auto_summarize, init_session as i
 from core.disambiguate import disambiguate
 from core.json_logger import json_log
 from core.cache import cache_get, cache_set, cache_purge_all
+from core.provider_manager import get_active_provider, get_provider_config
 import threading
 from agent.evaluator import evaluate_response, log_evaluation
 from core.loop_evolution import pulse, pulse_error, get_pulse_summary
@@ -412,13 +413,14 @@ async def react_loop(user_message: str,
     if stream_callback:
         stream_callback("__MSGTYPE__" + msg_type)
 
-    # Provider toujours DeepSeek
-    provider = 'deepseek'
+    # Provider dynamique via le manager (deepseek ou groq selon l'état)
+    provider = get_active_provider()
     # Aucun bridage artificiel : Santana s'arrête sur finish_reason='stop'
     # ou _SESSION_TIMEOUT (garde-fou technique 300s).
     max_iter = 50  # garde-fou technique (jamais atteint en usage normal)
     use_tools = True
-    logging.info(f'[ROUTER] Message {msg_type} → DeepSeek, outils libres')
+    p_label = get_provider_config(provider)["label"]
+    logging.info(f'[ROUTER] Message {msg_type} → {p_label}, outils libres')
 
     messages.append({"role": "user", "content": user_message})
 
@@ -443,7 +445,9 @@ async def react_loop(user_message: str,
             actual_provider = provider
             actual_tools = _filter_tools(msg_type, TOOLS) if use_tools else None
 
-            mt = 32000  # V4: augmenté de 16000 à 32000 pour les longues requêtes
+            # max_tokens dynamique selon le provider actif
+            # DeepSeek: 32K, Groq: 8K (limite API Groq)
+            mt = get_provider_config(actual_provider)["max_tokens"]
 
             # ── Coût : tracking passif seulement (ne bloque jamais) ────────
             _cost_est = estimate_cost_from_messages(messages, mt)
@@ -733,7 +737,7 @@ async def react_loop(user_message: str,
     # ── REMONTER LES MÉTRIQUES (Phase 4) ────────────────────────────
     if _stats is not None:
         _stats['tool_count'] = len(_tools_called)
-        _stats['provider'] = 'deepseek'
+        _stats['provider'] = get_active_provider()
         _stats['token_count'] = 0  # approximé dans evaluate
 
     # Livrer le dernier contenu généré (ou un message utile si vide)

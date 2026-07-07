@@ -231,6 +231,9 @@ _SENSITIVE_FRAGMENTS = [
 
 def tool_fs_read(path: str, offset: int = 1, limit: int = 200) -> str:
     """Lit un fichier dans ~/santana/. Permet à Santana de s'auto-inspecter."""
+    # Forcer les types (le LLM envoie parfois des strings)
+    offset = int(offset) if offset is not None else 1
+    limit = int(limit) if limit is not None else 200
     abs_path = os.path.realpath(os.path.join(_SAFE_BASE, path))
     if not abs_path.startswith(_SAFE_BASE):
         return "Erreur: chemin hors de ~/santana/."

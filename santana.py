@@ -82,6 +82,7 @@ from tools.cost_governor import get_status as _cost_status, reset as _cost_reset
 from agent.context import reset_session as _reset_context_session
 from tools.telegram_stream import TelegramStream
 from core.db import get_metrics_db
+from core import provider_manager as pm
 
 
 async def start_command(update: Update, context):
@@ -410,6 +411,34 @@ if __name__ == '__main__':
         _background_tasks.append(asyncio.create_task(_watchdog_ping()))
         _background_tasks.append(asyncio.create_task(_warmup_embeddings()))
         _background_tasks.append(asyncio.create_task(start_watchdog(_WD_CTX)))
+        # Probe DeepSeek en background quand on est sur Groq
+        async def _probe_deepseek_periodic():
+            """Si Santana est sur Groq, probe DeepSeek toutes les 30s.
+            Dès que DeepSeek répond, bascule automatiquement."""
+            await asyncio.sleep(15)  # attendre le démarrage complet
+            probes_since_switch = 0
+            while True:
+                await asyncio.sleep(30)
+                current = pm.get_active_provider()
+                if current == "groq":
+                    try:
+                        ok = await asyncio.to_thread(pm.probe_deepseek)
+                        if ok:
+                            logging.info("[PROBE] DeepSeek ✅ — basculement automatique")
+                            pm.set_active_provider("deepseek")
+                            probes_since_switch = 0
+                        else:
+                            probes_since_switch += 1
+                            if probes_since_switch % 6 == 0:  # toutes les ~3 min
+                                groq_dur = pm.get_groq_duration()
+                                if groq_dur:
+                                    logging.warning(
+                                        "[PROBE] Sur Groq depuis %.0fs — DeepSeek toujours ❌ "
+                                        "(probe #%d)", groq_dur, probes_since_switch
+                                    )
+                    except Exception as e:
+                        logging.debug("[PROBE] Erreur probe: %s", e)
+        _background_tasks.append(asyncio.create_task(_probe_deepseek_periodic()))
 
     async def _post_stop(app):
         for task in _background_tasks:

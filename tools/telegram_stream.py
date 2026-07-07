@@ -17,6 +17,8 @@ import logging
 import re
 import time
 
+from core import provider_manager as pm
+
 logger = logging.getLogger(__name__)
 
 _MAX_MSG_LEN = 4096          # limite Telegram par message
@@ -364,9 +366,20 @@ class TelegramStream:
         HTML. Ajoute pagination et connecteurs pour les réponses longues.
         Remplace le brouillon en cours d'édition par le texte définitif."""
         response = response or "…"
-        label = _MSGTYPE_LABEL.get(self.msg_type, "")
-        if label and not response.startswith(label):
-            response = label + response
+        # Tag provider discret : [DeepSeek 05:39] ou [Groq 05:39]
+        provider_name = pm.get_active_provider()
+        provider_label = pm.get_provider_label(provider_name)
+        now_str = time.strftime("%H:%M", time.localtime())
+        provider_tag = f"[{provider_label} {now_str}] "
+        # Ne pas dupliquer le tag si déjà présent (auto-correction)
+        if not response.startswith(provider_tag):
+            # Si le message commence déjà par un label comme "🔎 ",
+            # on place le provider tag AVANT
+            label = _MSGTYPE_LABEL.get(self.msg_type, "")
+            if label and response.startswith(label):
+                response = provider_tag + response
+            else:
+                response = provider_tag + response
         # Découper le texte BRUT (pas le HTML) pour que chaque partie garde
         # ses propres balises **/`` équilibrées — pas de <b> ouvert dans une
         # partie et fermé dans la suivante.
