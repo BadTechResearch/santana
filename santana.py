@@ -81,6 +81,7 @@ from core.react_loop import react_loop, reset_state as _reset_react_state
 from tools.cost_governor import get_status as _cost_status, reset as _cost_reset
 from agent.context import reset_session as _reset_context_session
 from tools.telegram_stream import TelegramStream
+from core.db import get_metrics_db
 
 
 async def start_command(update: Update, context):
@@ -189,6 +190,7 @@ async def handle_message(update: Update, context):
     if chat_id != CHAT_ID:
         await update.message.reply_text("❌ Non autorisé")
         return
+    _msg_start = time.time()
     try:
         # Placeholder immédiat : l'utilisateur voit une réponse démarrer tout
         # de suite au lieu de fixer la bulle "typing..." pendant 5-15s.
@@ -210,8 +212,9 @@ async def handle_message(update: Update, context):
                 pass
         stream.set_on_first_content(_cancel_typing)
 
+        _stats = {}
         try:
-            response = await react_loop(user_msg, stream_callback=stream.callback)
+            response = await react_loop(user_msg, stream_callback=stream.callback, _stats=_stats)
             await stream.finalize(response)
         finally:
             if not typing_task.done():
@@ -220,6 +223,38 @@ async def handle_message(update: Update, context):
                     await typing_task
                 except asyncio.CancelledError:
                     pass
+
+        # ── Enregistrement des métriques de latence (Phase 4) ──
+        _total_ms = int((time.time() - _msg_start) * 1000)
+        try:
+            _conn = get_metrics_db()
+            _conn.execute(
+                """INSERT INTO message_latency
+                   (timestamp, msg_type, ttft_ms, total_ms, tool_count,
+                    flood_429_count, token_count, provider, user_msg_len)
+                   VALUES (datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    stream.msg_type or "inconnu",
+                    stream.ttft_ms,
+                    _total_ms,
+                    _stats.get('tool_count', 0),
+                    stream.flood_429_count,
+                    _stats.get('token_count', 0),
+                    _stats.get('provider', 'deepseek'),
+                    len(user_msg or ''),
+                )
+            )
+            _conn.commit()
+            logging.info(
+                "[LATENCY] %s TTFT=%dms total=%dms outils=%d 429=%d",
+                stream.msg_type or "?",
+                stream.ttft_ms, _total_ms,
+                _stats.get('tool_count', 0),
+                stream.flood_429_count,
+            )
+        except Exception as _me:
+            logging.debug("[LATENCY] Échec enregistrement métriques: %s", _me)
+
     except Exception as e:
         logging.error(f"[HANDLER] handle_message error: {e}")
         try:

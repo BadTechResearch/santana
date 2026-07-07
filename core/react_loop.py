@@ -340,8 +340,14 @@ async def _stream_and_collect(messages, model, max_tokens, tools, tool_choice,
 
 
 async def react_loop(user_message: str,
-                     stream_callback=None) -> str:
-    """Boucle principale. stream_callback(content: str) appelé pour chaque token."""
+                     stream_callback=None, _stats: dict = None) -> str:
+    """Boucle principale. stream_callback(content: str) appelé pour chaque token.
+    
+    Args:
+        user_message: Le message de l'utilisateur.
+        stream_callback: Fonction appelée pour chaque token/chunk pendant le streaming.
+        _stats: Dict mutable optionnel pour remonter des métriques (tool_count, provider, token_count).
+    """
     # Initialiser le contexte au premier appel (pas à l'import pour les tests)
 
     # ─── Garde-fou : forcer user_message en str ──────────────────────
@@ -426,11 +432,13 @@ async def react_loop(user_message: str,
                                    "tes outils", "auto-description"])
 
     while iteration < max_iter:
-        # Vérification du timeout global de session
+        # Heartbeat + timeout check
         _elapsed = time.time() - _start_time
         if _elapsed > _SESSION_TIMEOUT:
             logging.warning(f"[TIMEOUT] Session dépassée ({_elapsed:.0f}s > {_SESSION_TIMEOUT}s) — arrêt après {iteration} itérations")
             break
+        if iteration > 0 and _elapsed > 15 * (iteration // 15):
+            logging.info("[HEARTBEAT] Itération %d, écoulé %.0fs", iteration, _elapsed)
         try:
             actual_provider = provider
             actual_tools = _filter_tools(msg_type, TOOLS) if use_tools else None
@@ -721,6 +729,12 @@ async def react_loop(user_message: str,
     # Quelle que soit la provenance (happy path, erreur, timeout),
     # la réponse passe par _finalize pour garantir que la mémoire
     # (push_exchange, maybe_auto_summarize, atlas) est toujours mise à jour.
+
+    # ── REMONTER LES MÉTRIQUES (Phase 4) ────────────────────────────
+    if _stats is not None:
+        _stats['tool_count'] = len(_tools_called)
+        _stats['provider'] = 'deepseek'
+        _stats['token_count'] = 0  # approximé dans evaluate
 
     # Livrer le dernier contenu généré (ou un message utile si vide)
     if last_content:

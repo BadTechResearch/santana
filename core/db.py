@@ -102,6 +102,19 @@ def _init_metrics_tables(conn: sqlite3.Connection):
             cout REAL, appels INTEGER,
             PRIMARY KEY (mois, provider)
         )""",
+        # Latence par message (Phase 4 — Monitoring)
+        """CREATE TABLE IF NOT EXISTS message_latency (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            msg_type TEXT,
+            ttft_ms INTEGER,
+            total_ms INTEGER,
+            tool_count INTEGER,
+            flood_429_count INTEGER,
+            token_count INTEGER,
+            provider TEXT,
+            user_msg_len INTEGER
+        )""",
     ]
     for stmt in tables:
         try:

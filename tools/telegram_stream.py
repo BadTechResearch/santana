@@ -188,6 +188,11 @@ class TelegramStream:
         # Backoff exponentiel sur flood 429
         self._retry_count = 0
         self._retry_delay = 0.5  # secondes, doublé à chaque 429
+        # Métriques de performance (Phase 4)
+        self._msg_received_ts: float = time.time()
+        self._first_content_ts: float | None = None
+        self.ttft_ms: int = 0          # time to first token
+        self.flood_429_count: int = 0   # nombre de 429 reçus
 
     def set_on_first_content(self, callback):
         """Enregistre une coroutine à exécuter dès le premier contenu réel
@@ -213,6 +218,8 @@ class TelegramStream:
         # asyncio de l'appelant, ce callback tourne dans un thread).
         if not self._has_sent_content:
             self._has_sent_content = True
+            self._first_content_ts = time.time()
+            self.ttft_ms = int((self._first_content_ts - self._msg_received_ts) * 1000)
             if self._on_first_content:
                 try:
                     asyncio.run_coroutine_threadsafe(self._on_first_content(), self._loop)
@@ -285,6 +292,7 @@ class TelegramStream:
                 # Flood 429 → backoff exponentiel (reporte la prochaine édition)
                 if "429" in err_str or "too many requests" in err_str or "flood" in err_str:
                     self._retry_count += 1
+                    self.flood_429_count += 1
                     self._retry_delay = min(0.5 * (2 ** self._retry_count), 10.0)  # max 10s
                     self._last_edit_ts = time.time() + self._retry_delay  # saute le prochain intervalle aussi
                     logger.warning("[TG_STREAM] Flood 429, backoff %.1fs (tentative %d)",
