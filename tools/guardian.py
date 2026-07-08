@@ -1,3 +1,109 @@
+
+
+
+_LAST_AUDIT_STATUS = []
+_LAST_AUDIT_TIME = 0
+
+
+def _check_metrics_integrity() -> list:
+    """Vérifie la cohérence interne des métriques Santana."""
+    anomalies = []
+    try:
+        from core.db import get_metrics_db
+        conn = get_metrics_db()
+
+        # 1. Table metrics non vide
+        m = conn.execute("SELECT COUNT(*) FROM metrics").fetchone()[0]
+        from datetime import datetime
+        if m == 0 and datetime.now().day > 1:
+            anomalies.append("Table metrics VIDE — record_usage() n'écrit pas dans metrics.db")
+
+        # 2. token_count non nul dans message_latency
+        zeros = conn.execute(
+            "SELECT COUNT(*) FROM message_latency WHERE token_count = 0 AND total_ms > 1000"
+        ).fetchone()[0]
+        if zeros > 10:
+            anomalies.append(f"{zeros} entrées message_latency avec token_count=0")
+
+        # 3. Souveraineté vs message_latency
+        api_calls = conn.execute(
+            "SELECT COUNT(*) FROM souverainete WHERE host='api.deepseek.com'"
+        ).fetchone()[0]
+        messages = conn.execute("SELECT COUNT(*) FROM message_latency").fetchone()[0]
+        if messages > 5 and api_calls < messages:
+            anomalies.append(f"Souveraineté ({api_calls}) < messages ({messages})")
+
+        # 4. Erreurs en croissance
+        errs = conn.execute("SELECT SUM(count) FROM errors").fetchone()[0] or 0
+        if errs > 100:
+            anomalies.append(f"{errs} erreurs cumulées")
+
+    except Exception as e:
+        anomalies.append(f"Erreur vérification métriques: {e}")
+
+    return anomalies
+
+
+def _run_audit_watchdog():
+    """Exécute périodiquement les vérifications d'intégrité."""
+    global _LAST_AUDIT_STATUS, _LAST_AUDIT_TIME
+    try:
+        anomalies = _check_metrics_integrity()
+        _LAST_AUDIT_STATUS = anomalies
+        _LAST_AUDIT_TIME = __import__('time').time()
+        for a in anomalies:
+            logger.warning("[AUDIT] ⚠️ %s", a)
+        if not anomalies:
+            logger.debug("[AUDIT] ✅ Toutes les métriques cohérentes")
+    except Exception as e:
+        logger.error("[AUDIT] Échec watchdog intégrité: %s", e)
+
+
+def get_audit_report() -> str:
+    """Retourne le rapport d'audit formaté pour /audit."""
+    checks = []
+    try:
+        from core.db import get_metrics_db
+        conn = get_metrics_db()
+
+        # Métriques
+        m = conn.execute("SELECT COUNT(*) FROM metrics").fetchone()[0]
+        checks.append(("✅" if m > 0 else "⚠️", f"metrics.db écritures: {m}"))
+
+        zeros = conn.execute(
+            "SELECT COUNT(*) FROM message_latency WHERE token_count = 0 AND total_ms > 1000"
+        ).fetchone()[0]
+        checks.append(("✅" if zeros < 10 else "⚠️", f"token_count=0: {zeros}"))
+
+        from core import provider_manager as pm
+        prov = pm.get_active_provider()
+        checks.append(("✅", f"Provider: {prov}"))
+
+        errs = conn.execute("SELECT SUM(count) FROM errors").fetchone()[0] or 0
+        checks.append(("✅" if errs < 5 else "⚠️", f"Erreurs outils: {errs}"))
+
+        api = conn.execute(
+            "SELECT COUNT(*) FROM souverainete WHERE host='api.deepseek.com'"
+        ).fetchone()[0]
+        msgs = conn.execute("SELECT COUNT(*) FROM message_latency").fetchone()[0]
+        ratio = f"{api}/{msgs}" if msgs else "N/A"
+        checks.append(("✅" if api >= msgs else "⚠️", f"API/Message ratio: {ratio}"))
+
+        from tools.cost_governor import get_status
+        cost = get_status()
+        checks.append(("✅", f"Budget: ${cost['cout_cumule_reel']:.4f} / ${cost['budget']:.2f} ({cost['niveau']})"))
+
+    except Exception as e:
+        checks.append(("❌", f"Erreur audit: {e}"))
+
+    footer = ""
+    if _LAST_AUDIT_STATUS:
+        footer = "\n⚠️ Anomalies detectees:" if _LAST_AUDIT_STATUS else "\n✅ Auto-verification: OK"
+
+    header = f"📊 **Audit Santana**\n"
+    result = header + "\n".join(f"{s} {t}" for s, t in checks) + footer
+    return result
+
 """Guardian — autonomie réelle de Santana.
 
 Jusqu'ici, `agent/decision.py`, `agent/patterns.py` et `agent/proactive.py`

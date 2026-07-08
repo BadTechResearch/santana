@@ -185,6 +185,16 @@ async def _typing_loop(bot, chat_id: int):
         logging.debug(f"[TYPING] Boucle terminée: {e}")
 
 
+async def audit_command(update: Update, context):
+    """Auto-diagnostic du système."""
+    try:
+        from tools.guardian import get_audit_report
+        report = get_audit_report()
+        await update.message.reply_text(report, parse_mode="Markdown")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Audit error: {e}")
+
+
 async def handle_message(update: Update, context):
     user_msg = update.message.text
     chat_id = update.effective_chat.id
