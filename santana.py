@@ -316,7 +316,7 @@ if os.path.exists(_CRASH_FLAG):
             _data = json.dumps({
                 "chat_id": CHAT_ID,
                 "text": _alert_text,
-                "parse_mode": "Markdown"
+                "parse_mode": "HTML"
             }).encode()
             _req = urllib.request.Request(
                 f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage",

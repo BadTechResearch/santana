@@ -132,6 +132,20 @@ def _api_patch(path: str, data: dict) -> dict:
 
 # ── Utilitaires Git bas niveau ────────────────────────────────────────────
 
+
+# ── Helpers ───────────────────────────────────────────────────────────────
+
+def _clean_repo_name(repo: str) -> str:
+    """Extrait le nom du dépôt si le format 'owner/repo' est utilisé.
+
+    Les outils exposés à l'utilisateur acceptent 'owner/repo' (ex: BadTechResearch/santana)
+    mais les fonctions internes utilisent l'URL complète avec GITHUB_ACCOUNT.
+    """
+    if "/" in repo:
+        return repo.split("/", 1)[1]
+    return repo
+
+
 def _git_env() -> dict:
     """Construit l'environnement pour les commandes git avec auth HTTPS."""
     token = _get_token()
@@ -149,7 +163,7 @@ def _git_env() -> dict:
 def _repo_url_https(repo: str) -> str:
     """URL HTTPS avec token embarqué pour auth silencieuse."""
     token = _get_token()
-    return f"https://x-access-token:{token}@github.com/{GITHUB_ACCOUNT}/{repo}.git"
+    return f"https://x-access-token:{token}@github.com/{GITHUB_ACCOUNT}/{_clean_repo_name(repo)}.git"
 
 
 def _git(cmd: list[str], cwd: str = None, timeout: int = 30) -> subprocess.CompletedProcess:
@@ -176,7 +190,8 @@ def _git(cmd: list[str], cwd: str = None, timeout: int = 30) -> subprocess.Compl
 
 def _ensure_repo(repo: str) -> str:
     """Vérifie que le repo existe en cache, le clone si nécessaire, pull sinon."""
-    repo_path = os.path.join(GIT_CACHE, repo)
+    clean = _clean_repo_name(repo)
+    repo_path = os.path.join(GIT_CACHE, clean)
     git_dir = os.path.join(repo_path, ".git")
 
     if os.path.exists(git_dir):
@@ -223,12 +238,13 @@ def tool_github_list_branches(repo: str) -> str:
     Args:
         repo: Nom du dépôt (ex: santana)
     """
+    clean = _clean_repo_name(repo)
     try:
-        branches = _api_get(f"/repos/{GITHUB_ACCOUNT}/{repo}/branches?per_page=100")
+        branches = _api_get(f"/repos/{GITHUB_ACCOUNT}/{clean}/branches?per_page=100")
         if not branches:
-            return f"📂 Aucune branche trouvée dans `{repo}`."
+            return f"📂 Aucune branche trouvée dans `{clean}`."
 
-        lines = [f"🌿 **Branches de {repo} :**\n"]
+        lines = [f"🌿 **Branches de {clean} :**\n"]
         for b in branches:
             name = b["name"]
             default = " ⬅️ défaut" if b.get("name") == "main" or b.get("name") == "master" else ""
@@ -246,14 +262,15 @@ def tool_github_list_files(repo: str, path: str = "") -> str:
         repo: Nom du dépôt (ex: santana)
         path: Chemin dans le dépôt (laisser vide pour la racine)
     """
+    clean = _clean_repo_name(repo)
     try:
         repo_path = _ensure_repo(repo)
     except RuntimeError as e:
-        return f"❌ Impossible d'accéder au dépôt '{repo}': {e}"
+        return f"❌ Impossible d'accéder au dépôt '{clean}': {e}"
 
     target = os.path.join(repo_path, path) if path else repo_path
     if not os.path.exists(target):
-        return f"❌ Chemin introuvable : '{path}' dans {repo}"
+        return f"❌ Chemin introuvable : '{path}' dans {clean}"
 
     try:
         items = sorted(os.listdir(target))
@@ -263,7 +280,7 @@ def tool_github_list_files(repo: str, path: str = "") -> str:
     if not items:
         return f"📂 Dossier vide : {repo}/{path}"
 
-    lines = [f"📂 **{repo}/{path or ''}** :\n"]
+    lines = [f"📂 **{clean}/{path or ''}** :\n"]
     for item in items:
         if item.startswith("."):
             continue
@@ -292,17 +309,18 @@ def tool_github_read(repo: str, path: str, max_chars: int = 15000) -> str:
         path: Chemin du fichier (ex: santana.py)
         max_chars: Nombre max de caractères (défaut: 15000)
     """
+    clean = _clean_repo_name(repo)
     try:
         repo_path = _ensure_repo(repo)
     except RuntimeError as e:
-        return f"❌ Impossible d'accéder au dépôt '{repo}': {e}"
+        return f"❌ Impossible d'accéder au dépôt '{clean}': {e}"
 
     full_path = os.path.abspath(os.path.join(repo_path, path))
     repo_abs = os.path.abspath(repo_path)
     if not full_path.startswith(repo_abs):
         return "❌ Chemin hors du dépôt."
     if not os.path.exists(full_path):
-        return f"❌ Fichier introuvable : {path} dans {repo}"
+        return f"❌ Fichier introuvable : {path} dans {clean}"
     if os.path.isdir(full_path):
         return f"❌ '{path}' est un dossier. Utilise github_list_files."
 
@@ -313,7 +331,7 @@ def tool_github_read(repo: str, path: str, max_chars: int = 15000) -> str:
         lines_count = content.count("\n")
         truncated = total > max_chars
 
-        header = f"📄 **{repo}/{path}** ({lines_count} lignes, {min(total, max_chars)}/{total} caractères)"
+        header = f"📄 **{clean}/{path}** ({lines_count} lignes, {min(total, max_chars)}/{total} caractères)"
         if truncated:
             header += " — ⚠️ TRONQUÉ"
 
@@ -336,10 +354,11 @@ def tool_github_write(repo: str, path: str, content: str, message: str = "") -> 
         content: Contenu à écrire
         message: Message de commit (optionnel — auto-généré si vide)
     """
+    clean = _clean_repo_name(repo)
     try:
         repo_path = _ensure_repo(repo)
     except RuntimeError as e:
-        return f"❌ Impossible d'accéder au dépôt '{repo}': {e}"
+        return f"❌ Impossible d'accéder au dépôt '{clean}': {e}"
 
     full_path = os.path.abspath(os.path.join(repo_path, path))
     repo_abs = os.path.abspath(repo_path)
@@ -368,7 +387,7 @@ def tool_github_write(repo: str, path: str, content: str, message: str = "") -> 
         commit_hash = hash_result.stdout.strip()[:12]
 
         return (
-            f"✅ {action} réussie dans `{repo}/{path}`\n"
+            f"✅ {action} réussie dans `{clean}/{path}`\n"
             f"🔖 Commit: `{commit_hash}`\n"
             f"💬 Message: {commit_msg}"
         )
@@ -388,17 +407,18 @@ def tool_github_delete_file(repo: str, path: str, message: str = "") -> str:
         path: Chemin du fichier à supprimer
         message: Message de commit (optionnel)
     """
+    clean = _clean_repo_name(repo)
     try:
         repo_path = _ensure_repo(repo)
     except RuntimeError as e:
-        return f"❌ Impossible d'accéder au dépôt '{repo}': {e}"
+        return f"❌ Impossible d'accéder au dépôt '{clean}': {e}"
 
     full_path = os.path.abspath(os.path.join(repo_path, path))
     repo_abs = os.path.abspath(repo_path)
     if not full_path.startswith(repo_abs):
         return "❌ Chemin hors du dépôt."
     if not os.path.exists(full_path):
-        return f"❌ Fichier introuvable : {path} dans {repo}"
+        return f"❌ Fichier introuvable : {path} dans {clean}"
     if os.path.isdir(full_path):
         return f"❌ '{path}' est un dossier. Suppression de dossiers non supportée."
 
@@ -418,7 +438,7 @@ def tool_github_delete_file(repo: str, path: str, message: str = "") -> str:
         commit_hash = hash_result.stdout.strip()[:12]
 
         return (
-            f"🗑️ Fichier `{repo}/{path}` supprimé.\n"
+            f"🗑️ Fichier `{clean}/{path}` supprimé.\n"
             f"🔖 Commit: `{commit_hash}`\n"
             f"💬 Message: {commit_msg}"
         )
@@ -456,17 +476,18 @@ def tool_github_create_branch(repo: str, branch: str, from_branch: str = "main")
         branch: Nom de la nouvelle branche (ex: feature/ma-fonctionnalite)
         from_branch: Branche source (défaut: main)
     """
+    clean = _clean_repo_name(repo)
     try:
         # Récupérer le SHA du dernier commit de la branche source
-        ref_data = _api_get(f"/repos/{GITHUB_ACCOUNT}/{repo}/git/ref/heads/{from_branch}")
+        ref_data = _api_get(f"/repos/{GITHUB_ACCOUNT}/{clean}/git/ref/heads/{from_branch}")
         sha = ref_data["object"]["sha"]
 
         # Créer la nouvelle référence
-        _api_post(f"/repos/{GITHUB_ACCOUNT}/{repo}/git/refs", {
+        _api_post(f"/repos/{GITHUB_ACCOUNT}/{clean}/git/refs", {
             "ref": f"refs/heads/{branch}",
             "sha": sha,
         })
-        return f"✅ Branche **{branch}** créée sur `{repo}` (depuis `{from_branch}`)."
+        return f"✅ Branche **{branch}** créée sur `{clean}` (depuis `{from_branch}`)."
     except RuntimeError as e:
         return f"❌ Erreur création branche: {e}"
 
@@ -482,15 +503,16 @@ def tool_github_create_pr(repo: str, head: str, title: str, body: str = "", base
         body: Description de la PR (optionnel)
         base: Branche cible (défaut: main)
     """
+    clean = _clean_repo_name(repo)
     try:
-        result = _api_post(f"/repos/{GITHUB_ACCOUNT}/{repo}/pulls", {
+        result = _api_post(f"/repos/{GITHUB_ACCOUNT}/{clean}/pulls", {
             "title": title,
             "body": body or "",
             "head": head,
             "base": base,
         })
         return (
-            f"✅ Pull Request créée sur **{repo}**\n"
+            f"✅ Pull Request créée sur **{clean}**\n"
             f"🔗 {result['html_url']}\n"
             f"🏷️ #{result['number']} — {title}"
         )
@@ -522,13 +544,14 @@ def tool_github_merge_pr(repo: str, pull_number: int, commit_title: str = "") ->
         pull_number: Numéro de la PR
         commit_title: Titre du commit de merge (optionnel)
     """
+    clean = _clean_repo_name(repo)
     try:
-        result = _api_put(f"/repos/{GITHUB_ACCOUNT}/{repo}/pulls/{pull_number}/merge", {
+        result = _api_put(f"/repos/{GITHUB_ACCOUNT}/{clean}/pulls/{pull_number}/merge", {
             "commit_title": commit_title or f"Merge PR #{pull_number} par Santana",
             "merge_method": "merge",
         })
         if result.get("merged"):
-            return f"✅ PR #{pull_number} mergée sur `{repo}`.\n🔗 {result.get('sha', '')[:12]}"
+            return f"✅ PR #{pull_number} mergée sur `{clean}`.\n🔗 {result.get('sha', '')[:12]}"
         else:
             return f"⚠️ PR #{pull_number} non mergée: {result.get('message', 'raison inconnue')}"
     except RuntimeError as e:
