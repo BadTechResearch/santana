@@ -190,7 +190,7 @@ async def audit_command(update: Update, context):
     try:
         from tools.guardian import get_audit_report
         report = get_audit_report()
-        await update.message.reply_text(report, parse_mode="Markdown")
+        await update.message.reply_text(report, parse_mode="HTML")
     except Exception as e:
         await update.message.reply_text(f"❌ Audit error: {e}")
 
@@ -415,6 +415,7 @@ if __name__ == '__main__':
         await app.bot.set_my_commands([
             ('start', '🔄 Démarrer la session'),
             ('status', '📊 Statut système'),
+            ('audit', '🔍 Audit système'),
             ('reset', '🗑️ Réinitialiser la session'),
             ('help', '🤝 Aide'),
         ])
@@ -458,6 +459,7 @@ if __name__ == '__main__':
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).post_init(_post_init).post_stop(_post_stop).build()
     for cmd, handler in [
         ('start', start_command), ('status', status_command), ('statut', status_command),
+        ('audit', audit_command),
         ('reset', reset_command),
         ('help', help_command),
     ]:

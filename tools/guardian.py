@@ -60,13 +60,12 @@ def _run_audit_watchdog():
 
 
 def get_audit_report() -> str:
-    """Retourne le rapport d'audit formaté pour /audit."""
+    """Retourne le rapport d'audit formaté pour /audit (HTML)."""
     checks = []
     try:
         from core.db import get_metrics_db
         conn = get_metrics_db()
 
-        # Métriques
         m = conn.execute("SELECT COUNT(*) FROM metrics").fetchone()[0]
         checks.append(("✅" if m > 0 else "⚠️", f"metrics.db écritures: {m}"))
 
@@ -98,10 +97,12 @@ def get_audit_report() -> str:
 
     footer = ""
     if _LAST_AUDIT_STATUS:
-        footer = "\n⚠️ Anomalies detectees:" if _LAST_AUDIT_STATUS else "\n✅ Auto-verification: OK"
+        footer = "<b>⚠️ Anomalies detectees:</b>\n" + "\n".join(f"• {a}" for a in _LAST_AUDIT_STATUS)
 
-    header = f"📊 **Audit Santana**\n"
-    result = header + "\n".join(f"{s} {t}" for s, t in checks) + footer
+    header = "<b>📊 Audit Santana</b>\n"
+    result = header + "\n".join(f"{s} <code>{t}</code>" for s, t in checks)
+    if footer:
+        result += "\n\n" + footer
     return result
 
 """Guardian — autonomie réelle de Santana.
