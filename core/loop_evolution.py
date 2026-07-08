@@ -30,7 +30,16 @@ def _load_state() -> dict:
     if os.path.exists(PULSE_FILE):
         try:
             with open(PULSE_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
+                state = json.load(f)
+            # Migration : adapt_triggers doit être un dict, pas une liste
+            if isinstance(state.get("adapt_triggers"), list):
+                state["adapt_triggers"] = {}
+                logger.warning("[EVOLVE] Migration adapt_triggers: list → dict")
+            # Migration : recent_errors doit être une liste de dicts
+            if isinstance(state.get("recent_errors"), dict):
+                state["recent_errors"] = list(state["recent_errors"].values())
+                logger.warning("[EVOLVE] Migration recent_errors: dict → list")
+            return state
         except (json.JSONDecodeError, OSError) as e:
             logger.error(f"[EVOLVE] Load error: {e}")
     return {}
@@ -61,11 +70,19 @@ def pulse(response: str, user_message: str, tools_used: list) -> None:
     state["tools_count"] = old_count + len(tools_used or [])
 
     log = state.setdefault("interaction_log", [])
+    # tools_used peut être un set[str] (noms d'outils) ou une list[dict] avec clé "name"
+    if tools_used:
+        if isinstance(next(iter(tools_used)), str):
+            tool_names = list(tools_used)
+        else:
+            tool_names = [t.get("name", "?") for t in tools_used]
+    else:
+        tool_names = []
     log.append({
         "timestamp": now,
         "user_msg_len": len(user_message),
         "response_len": len(response),
-        "tools": [t.get("name", "?") for t in (tools_used or [])],
+        "tools": tool_names,
     })
     if len(log) > 100:
         state["interaction_log"] = log[-100:]

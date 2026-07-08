@@ -732,6 +732,23 @@ _reg_register("render_preview", tool_render_preview, arg_map={"source": "source"
 from tools.github_tools import register_all as _github_register_all
 _github_register_all()
 
+# ── Synchronisation TOOLS ← Registry ──────────────────────────────────────
+# Les outils enregistrés via registry.register() ne sont pas automatiquement
+# dans TOOLS (chargé depuis tools.json). On synchronise ici pour que le
+# guardrail dans react_loop (basé sur TOOLS) voie tous les outils.
+from tools.registry import get_tools as _reg_get_tools
+_registry_all = _reg_get_tools()
+_existing_names = {t["function"]["name"] for t in TOOLS}
+for _rt in _registry_all:
+    if _rt["function"]["name"] not in _existing_names:
+        TOOLS.append(_rt)
+        _existing_names.add(_rt["function"]["name"])
+if len(_registry_all) != len(TOOLS):
+    logging.info("[TOOLS] Synchronisé: %d outils registry → %d outils TOOLS (+%d GitHub/MCP)",
+                  len(_registry_all), len(TOOLS), len(TOOLS) - len(_existing_names))
+else:
+    logging.info("[TOOLS] %d outils chargés (registry + JSON synchronisés)", len(TOOLS))
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # EXECUTE TOOL (point d'entrée unique depuis react_loop)
