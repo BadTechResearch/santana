@@ -27,7 +27,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 
 # Timeout pour les appels Xpoz SDK (les 44s viennent de là)
 _XPOZ_TIMEOUT = 10  # secondes max par appel Xpoz
-_XPOZ_EXECUTOR = ThreadPoolExecutor(max_workers=1)
+_XPOZ_EXECUTOR = ThreadPoolExecutor(max_workers=4)
 
 
 def _xpoz_call_with_timeout(fn, *args, **kwargs):

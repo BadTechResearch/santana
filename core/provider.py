@@ -5,6 +5,7 @@ Le passage d'un provider à l'autre est notifié au provider_manager
 qui maintient l'état global (tag réponse, config dynamique).
 """
 
+import copy
 import json, logging, os, requests, time
 from typing import Generator
 
@@ -98,11 +99,11 @@ def _truncate_messages(messages: list, provider_name: str) -> list:
 
     truncated = list(system_msgs)
     if last_user:
-        truncated.append(last_user)
+        truncated.append(copy.deepcopy(last_user))
     if last_assistant:
-        truncated.append(last_assistant)
+        truncated.append(copy.deepcopy(last_assistant))
     if last_tool:
-        truncated.append(last_tool)
+        truncated.append(copy.deepcopy(last_tool))
 
     # Tronquer les contenus tool trop longs
     for m in truncated:

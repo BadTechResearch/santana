@@ -16,12 +16,15 @@ except Exception as e:
     logging.error("[MEMORY_OPS] pytz fallback: %s", e)
 
 # Atlas
-_ATLAS_OK = True
-try:
-    from atlas_engine.atlas import learn as _atlas_learn
-except Exception as _ae:
-    _ATLAS_OK = False
-    logging.error(f"[ATLAS] Atlas import failure: {_ae}")
+def _check_atlas_ok():
+    """Vérifie si Atlas est disponible (réévalué à chaque appel)."""
+    try:
+        from atlas_engine.atlas import learn
+        return True, learn
+    except Exception:
+        return False, None
+
+_ATLAS_OK, _atlas_learn = _check_atlas_ok()
 
 
 def tool_memory_query(query: str) -> str:

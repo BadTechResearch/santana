@@ -12,6 +12,7 @@ get_failure_status et leurs helpers.)
 
 import os, json
 import logging
+import threading
 import sqlite3
 import subprocess
 from datetime import datetime
@@ -19,6 +20,7 @@ from datetime import datetime
 from core.db import get_metrics_db
 
 logger = logging.getLogger(__name__)
+_STATE_LOCK = threading.Lock()
 
 STATE_KEY = "orchestration_failures"
 
@@ -44,7 +46,8 @@ COMPONENT_SERVICE = {
 
 def _load_failures() -> dict:
     """Charge l'état depuis SQLite (metrics.db)."""
-    try:
+    with _STATE_LOCK:
+        try:
         conn = get_metrics_db()
         c = conn.cursor()
         c.execute("SELECT value FROM tool_state WHERE key=?", (STATE_KEY,))
