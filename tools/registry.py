@@ -122,6 +122,20 @@ def register(
     _CACHED_TOOLS = None
 
 
+def _coerce_type(value: Any, param_name: str) -> Any:
+    """Convertit une valeur au type attendu selon le nom du paramètre.
+    
+    Protection contre le bug des defaults string -> int.
+    """
+    if isinstance(value, str) and value.isdigit():
+        # Noms de paramètres qui doivent être des entiers
+        int_params = {"max_chars", "pull_number", "count", "max_results", "timeout", 
+                      "max_tweets", "max_posts", "offset", "limit", "max_pages"}
+        if param_name in int_params:
+            return int(value)
+    return value
+
+
 def dispatch(name: str, args: dict) -> str | None:
     """Exécute un outil par son nom.
 
@@ -144,9 +158,9 @@ def dispatch(name: str, args: dict) -> str | None:
     missing = []
     for param, arg_key in arg_map.items():
         if arg_key in args:
-            kwargs[param] = args[arg_key]
+            kwargs[param] = _coerce_type(args[arg_key], param)
         elif param in defaults:
-            kwargs[param] = defaults[param]
+            kwargs[param] = _coerce_type(defaults[param], param)
         else:
             missing.append(param)
 

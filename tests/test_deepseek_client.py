@@ -1,8 +1,12 @@
-"""Tests pour deepseek_client.py : complete(), complete_stream(), ask() avec mocks."""
+"""Tests pour deepseek_client.py — wrapper vers core.provider.
+
+deepseek_client est devenu un wrapper mince qui délègue à core.provider.
+Ces tests vérifient que le wrapper appelle correctement le provider,
+sans tester la logique de fallback/retry (qui est dans test_provider.py).
+"""
 import os
 import sys
 import json
-import time
 import unittest
 from unittest.mock import patch, MagicMock
 
@@ -15,237 +19,145 @@ from deepseek_client import complete, complete_stream, ask
 
 
 class TestComplete(unittest.TestCase):
-    """Test de complete() — appels LLM synchrones."""
+    """Test de complete() — délègue à core.provider.complete."""
 
-    @patch("deepseek_client.requests.post")
-    def test_complete_success(self, mock_post):
-        """Appel réussi retourne le choix."""
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.json.return_value = {
-            "choices": [{"message": {"content": "Bonjour"}, "finish_reason": "stop"}]
+    @patch("deepseek_client._provider_complete")
+    def test_complete_success(self, mock_complete):
+        """Appel réussi retourne le message."""
+        mock_complete.return_value = {
+            "message": {"content": "Bonjour"},
+            "finish_reason": "stop"
         }
-        mock_post.return_value = mock_resp
-
         result = complete(
             [{"role": "user", "content": "Dis bonjour"}],
             model="deepseek-chat", max_tokens=100
         )
         self.assertEqual(result["message"]["content"], "Bonjour")
         self.assertEqual(result["finish_reason"], "stop")
-        # Vérifier que l'appel POST a été fait
-        mock_post.assert_called_once()
+        mock_complete.assert_called_once()
 
-    @patch("deepseek_client.requests.post")
-    def test_complete_429_retry(self, mock_post):
-        """429 Rate Limited déclenche un retry puis réussit."""
-        mock_429 = MagicMock()
-        mock_429.status_code = 429
-        mock_429.raise_for_status.side_effect = __import__('requests').exceptions.HTTPError("429")
-
-        mock_ok = MagicMock()
-        mock_ok.status_code = 200
-        mock_ok.json.return_value = {
-            "choices": [{"message": {"content": "OK"}, "finish_reason": "stop"}]
+    @patch("deepseek_client._provider_complete")
+    def test_complete_passes_args(self, mock_complete):
+        """Vérifie la transmission des arguments au provider."""
+        mock_complete.return_value = {
+            "message": {"content": "OK"},
+            "finish_reason": "stop"
         }
+        complete(
+            [{"role": "user", "content": "test"}],
+            model="deepseek-v4-flash", max_tokens=100, timeout=60
+        )
+        mock_complete.assert_called_once()
+        _name, args, kwargs = mock_complete.mock_calls[0]
+        self.assertEqual(kwargs.get("max_tokens"), 100)
+        self.assertEqual(kwargs.get("timeout"), 60)
+        self.assertEqual(kwargs.get("model"), "deepseek-v4-flash")
 
-        mock_post.side_effect = [mock_429, mock_ok]
-
-        result = complete([{"role": "user", "content": "test"}])
-        self.assertEqual(result["message"]["content"], "OK")
-        self.assertEqual(mock_post.call_count, 2)
-
-    @patch("deepseek_client.requests.post")
-    def test_complete_402_credit(self, mock_post):
-        """402 Payment Required déclenche le fallback (pas de RuntimeError)."""
-        mock_resp = MagicMock()
-        mock_resp.status_code = 402
-        mock_post.return_value = mock_resp
-
-        # Le comportement actuel est un fallback gracieux, pas une exception
-        result = complete([{"role": "user", "content": "test"}])
-        self.assertIsNotNone(result)
-
-    @patch("deepseek_client.requests.post")
-    def test_complete_401_unauthorized(self, mock_post):
-        """401 Unauthorized déclenche le fallback (pas de RuntimeError)."""
-        mock_resp = MagicMock()
-        mock_resp.status_code = 401
-        mock_post.return_value = mock_resp
-
-        # Le comportement actuel est un fallback gracieux, pas une exception
-        result = complete([{"role": "user", "content": "test"}])
-        self.assertIsNotNone(result)
-
-    @patch("deepseek_client.requests.post")
-    def test_complete_timeout_retry(self, mock_post):
-        """Timeout réseau déclenche retry puis réussit."""
-        mock_post.side_effect = [
-            __import__('requests').exceptions.Timeout("timeout"),
-            MagicMock(status_code=200, json=lambda: {
-                "choices": [{"message": {"content": "OK"}, "finish_reason": "stop"}]
-            })
-        ]
-
-        result = complete([{"role": "user", "content": "test"}])
-        self.assertEqual(result["message"]["content"], "OK")
-        self.assertEqual(mock_post.call_count, 2)
-
-    @patch("core.provider.complete")
-    @patch("deepseek_client.requests.post")
-    def test_complete_all_retries_exhausted(self, mock_post, mock_prov):
-        """Toutes les tentatives échouent (429) → retry puis fallback."""
-        import deepseek_client as _dsc
-        from requests.exceptions import HTTPError
-        if not _dsc.DEEPSEEK_KEY:
-            _dsc.DEEPSEEK_KEY = "test-key-for-mock"
-
-        # 429 trois fois (retry) puis RuntimeError (pas de fallback réussi)
-        http_err = HTTPError("429 Rate Limited")
-        mock_post.side_effect = http_err
-        mock_prov.side_effect = RuntimeError("Fallback provider aussi indisponible")
-
+    @patch("deepseek_client._provider_complete")
+    def test_complete_propagates_error(self, mock_complete):
+        """Les exceptions du provider sont propagées par le wrapper."""
+        mock_complete.side_effect = RuntimeError("Provider error")
         with self.assertRaises(RuntimeError):
             complete([{"role": "user", "content": "test"}])
 
 
 class TestCompleteStream(unittest.TestCase):
-    """Test de complete_stream() — streaming asynchrone."""
+    """Test de complete_stream() — wrapper vers core.provider.complete_stream."""
 
-    def _make_stream_resp(self, chunks):
-        """Crée une réponse mock qui yield des lignes SSE."""
-        lines = []
-        for chunk_data in chunks:
-            lines.append(f"data: {json.dumps(chunk_data)}\n".encode())
-        lines.append(b"data: [DONE]\n")
-        mock_resp = MagicMock()
-        mock_resp.status_code = 200
-        mock_resp.iter_lines.return_value = lines
-        return mock_resp
-
-    @patch("deepseek_client.requests.post")
-    def test_stream_content_chunks(self, mock_post):
-        """Les chunks de contenu sont yield correctement."""
+    @patch("deepseek_client._provider_stream")
+    def test_stream_content_chunks(self, mock_stream):
+        """Les chunks du provider sont yield correctement."""
         chunks = [
-            {"choices": [{"delta": {"content": "Bon"}, "finish_reason": None}]},
-            {"choices": [{"delta": {"content": "jour"}, "finish_reason": "stop"}]},
+            {"type": "content", "content": "Bon"},
+            {"type": "content", "content": "jour"},
+            {"type": "complete", "content": "", "finish_reason": "stop"},
         ]
-        mock_post.return_value = self._make_stream_resp(chunks)
+        mock_stream.return_value = iter(chunks)
 
         results = list(complete_stream(
             [{"role": "user", "content": "test"}],
             model="deepseek-chat"
         ))
 
+        self.assertEqual(len(results), 3)
         contents = [r["content"] for r in results if r["type"] == "content"]
         self.assertEqual("".join(contents), "Bonjour")
 
-    @patch("deepseek_client.requests.post")
-    def test_stream_tool_calls(self, mock_post):
-        """Les tool_calls sont yield dans le chunk 'complete'."""
-        chunks = [
-            {
-                "choices": [{
-                    "delta": {
-                        "tool_calls": [{
-                            "index": 0, "id": "call_1",
-                            "function": {"name": "web_search", "arguments": '{"query":'}
+    @patch("deepseek_client._provider_stream")
+    def test_stream_propagates_error(self, mock_stream):
+        """Les erreurs du provider sont propagées."""
+        mock_stream.side_effect = RuntimeError("Stream error")
 
-                        }]
-                    },
-                    "finish_reason": None
-                }]
-            },
-            {
-                "choices": [{
-                    "delta": {
-                        "tool_calls": [{
-                            "index": 0,
-                            "function": {"arguments": ' "test"}', "name": ""}
-                        }]
-                    },
-                    "finish_reason": None
-                }]
-            },
-            {
-                "choices": [{
-                    "delta": {},
-                    "finish_reason": "tool_calls"
-                }]
-            },
-        ]
-        mock_post.return_value = self._make_stream_resp(chunks)
+        with self.assertRaises(RuntimeError):
+            for _ in complete_stream([{"role": "user", "content": "test"}]):
+                pass
 
-        results = list(complete_stream(
+    @patch("deepseek_client._provider_stream")
+    def test_stream_passes_tools(self, mock_stream):
+        """Les outils sont transmis au provider."""
+        mock_stream.return_value = iter([])
+        tools = [{"type": "function", "function": {"name": "web_search"}}]
+        list(complete_stream(
             [{"role": "user", "content": "test"}],
-            model="deepseek-chat"
+            tools=tools, tool_choice="auto"
         ))
-
-        complete_chunks = [r for r in results if r["type"] == "complete"]
-        self.assertEqual(len(complete_chunks), 1)
-        tc = complete_chunks[0].get("tool_calls", [])
-        self.assertEqual(len(tc), 1)
-        self.assertEqual(tc[0]["function"]["name"], "web_search")
-        self.assertEqual(tc[0]["function"]["arguments"], '{"query": "test"}')
-
-    @patch("core.provider.complete_stream")
-    @patch("deepseek_client._ds_complete_stream")
-    def test_stream_402_error(self, mock_ds, mock_prov):
-        """
-        Erreur DeepSeek en streaming → fallback vers le provider.
-        Vérifie que la chaîne de fallback est déclenchée.
-        """
-        mock_ds.return_value = iter([{"type": "error", "content": "402 Payment Required"}])
-        mock_prov.return_value = iter([{"type": "error", "content": "Fallback aussi échoué"}])
-
-        results = list(complete_stream([{"role": "user", "content": "test"}]))
-        errors = [r for r in results if r["type"] == "error"]
-        self.assertTrue(len(errors) > 0)
-        self.assertTrue(mock_ds.called)
-        self.assertTrue(mock_prov.called)
-
-    @patch("deepseek_client.requests.post")
-    def test_stream_retry_on_429(self, mock_post):
-        """429 dans le stream → retry puis succès."""
-        mock_429 = MagicMock()
-        mock_429.status_code = 429
-        mock_429.raise_for_status.side_effect = __import__('requests').exceptions.HTTPError("429")
-
-        chunks = [
-            {"choices": [{"delta": {"content": "OK"}, "finish_reason": "stop"}]},
-        ]
-        mock_ok = self._make_stream_resp(chunks)
-
-        mock_post.side_effect = [mock_429, mock_ok]
-
-        results = list(complete_stream(
-            [{"role": "user", "content": "test"}],
-            model="deepseek-chat"
-        ))
-        contents = [r["content"] for r in results if r["type"] == "content"]
-        self.assertEqual("".join(contents), "OK")
-        self.assertEqual(mock_post.call_count, 2)
+        mock_stream.assert_called_once()
+        _name, args, kwargs = mock_stream.mock_calls[0]
+        self.assertEqual(kwargs.get("tools"), tools)
+        self.assertEqual(kwargs.get("tool_choice"), "auto")
 
 
 class TestAsk(unittest.TestCase):
-    """Test de ask() — wrapper simple."""
+    """Test de ask() — helper one-shot qui appelle complete()."""
 
-    @patch("deepseek_client._ds_complete")
-    def test_ask_success(self, mock_ds):
-        """ask() retourne le contenu du message."""
-        mock_ds.return_value = {
+    @patch("deepseek_client._provider_complete")
+    def test_ask_string_prompt(self, mock_complete):
+        """ask() avec prompt string appelle complete avec messages."""
+        mock_complete.return_value = {
             "message": {"content": "Réponse test"},
             "finish_reason": "stop"
         }
-        result = ask([{"role": "user", "content": "test"}])
+        result = ask("Dis bonjour")
         self.assertEqual(result, "Réponse test")
+        mock_complete.assert_called_once()
+        _name, args, kwargs = mock_complete.mock_calls[0]
+        self.assertEqual(len(args[0]), 1)
+        self.assertEqual(args[0][0]["role"], "user")
 
-    @patch("deepseek_client._ds_complete")
-    def test_ask_raises_on_error(self, mock_ds):
-        """ask() propage les exceptions."""
-        mock_ds.side_effect = RuntimeError("API down")
+    @patch("deepseek_client._provider_complete")
+    def test_ask_with_system(self, mock_complete):
+        """ask() avec système ajoute un message system."""
+        mock_complete.return_value = {
+            "message": {"content": "OK"},
+            "finish_reason": "stop"
+        }
+        result = ask("test", system="Sois concis")
+        self.assertEqual(result, "OK")
+        mock_complete.assert_called_once()
+        _name, args, kwargs = mock_complete.mock_calls[0]
+        self.assertEqual(len(args[0]), 2)
+        self.assertEqual(args[0][0]["role"], "system")
+
+    @patch("deepseek_client._provider_complete")
+    def test_ask_list_messages(self, mock_complete):
+        """ask() accepte directement une liste de messages."""
+        mock_complete.return_value = {
+            "message": {"content": "OK"},
+            "finish_reason": "stop"
+        }
+        messages = [{"role": "user", "content": "test"}]
+        result = ask(messages)
+        self.assertEqual(result, "OK")
+        mock_complete.assert_called_once()
+        _name, args, kwargs = mock_complete.mock_calls[0]
+        self.assertIs(args[0], messages)
+
+    @patch("deepseek_client._provider_complete")
+    def test_ask_raises_on_error(self, mock_complete):
+        """ask() propage les exceptions du provider."""
+        mock_complete.side_effect = RuntimeError("API down")
         with self.assertRaises(RuntimeError):
-            ask([{"role": "user", "content": "test"}])
+            ask("test")
 
 
 if __name__ == "__main__":

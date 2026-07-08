@@ -564,25 +564,25 @@ def tool_github_merge_pr(repo: str, pull_number: int, commit_title: str = "") ->
 
 def register_all():
     """Enregistre tous les outils GitHub dans le registre Santana."""
-    from tools.tools import _register
+    from tools.registry import register as _reg_register
 
-    _register("github_list_repos",    tool_github_list_repos,    arg_map={})
-    _register("github_list_branches", tool_github_list_branches, arg_map={"repo": "repo"})
-    _register("github_list_files",    tool_github_list_files,    arg_map={"repo": "repo", "path": "path"},
+    _reg_register("github_list_repos",    tool_github_list_repos,    arg_map={})
+    _reg_register("github_list_branches", tool_github_list_branches, arg_map={"repo": "repo"})
+    _reg_register("github_list_files",    tool_github_list_files,    arg_map={"repo": "repo", "path": "path"},
               defaults={"path": ""})
-    _register("github_read",          tool_github_read,          arg_map={"repo": "repo", "path": "path", "max_chars": "max_chars"},
-              defaults={"max_chars": "15000"})
-    _register("github_write",         tool_github_write,         arg_map={"repo": "repo", "path": "path", "content": "content", "message": "message"},
+    _reg_register("github_read",          tool_github_read,          arg_map={"repo": "repo", "path": "path", "max_chars": "max_chars"},
+              defaults={"max_chars": 15000})
+    _reg_register("github_write",         tool_github_write,         arg_map={"repo": "repo", "path": "path", "content": "content", "message": "message"},
               defaults={"message": ""})
-    _register("github_delete_file",   tool_github_delete_file,   arg_map={"repo": "repo", "path": "path", "message": "message"},
+    _reg_register("github_delete_file",   tool_github_delete_file,   arg_map={"repo": "repo", "path": "path", "message": "message"},
               defaults={"message": ""})
-    _register("github_create_repo",   tool_github_create_repo,   arg_map={"name": "name", "description": "description", "private": "private"},
+    _reg_register("github_create_repo",   tool_github_create_repo,   arg_map={"name": "name", "description": "description", "private": "private"},
               defaults={"description": "", "private": "True"})
-    _register("github_create_branch", tool_github_create_branch, arg_map={"repo": "repo", "branch": "branch", "from_branch": "from_branch"},
+    _reg_register("github_create_branch", tool_github_create_branch, arg_map={"repo": "repo", "branch": "branch", "from_branch": "from_branch"},
               defaults={"from_branch": "main"})
-    _register("github_create_pr",     tool_github_create_pr,     arg_map={"repo": "repo", "head": "head", "title": "title", "body": "body", "base": "base"},
+    _reg_register("github_create_pr",     tool_github_create_pr,     arg_map={"repo": "repo", "head": "head", "title": "title", "body": "body", "base": "base"},
               defaults={"body": "", "base": "main"})
-    _register("github_merge_pr",      tool_github_merge_pr,      arg_map={"repo": "repo", "pull_number": "pull_number", "commit_title": "commit_title"},
+    _reg_register("github_merge_pr",      tool_github_merge_pr,      arg_map={"repo": "repo", "pull_number": "pull_number", "commit_title": "commit_title"},
               defaults={"commit_title": ""})
 
     logging.info("[GITHUB] 10 outils enregistrés : github_list_repos, github_list_branches, github_list_files, github_read, github_write, github_delete_file, github_create_repo, github_create_branch, github_create_pr, github_merge_pr")

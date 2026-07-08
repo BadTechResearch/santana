@@ -388,7 +388,7 @@ _reg_register("skill_view", _skill_view, arg_map={"name": "name"})
 _reg_register("skill_manage", _skill_manage, arg_map={"action": "action", "name": "name", "content": "content"}, defaults={"content": ""})
 _reg_register("skill_list", _skill_list, arg_map={})
 _reg_register("delegate_task", tool_delegate_task, arg_map={"goal": "goal", "context": "context"}, defaults={"context": ""})
-_reg_register("read_pdf", tool_read_pdf, arg_map={"path": "path", "max_chars": "max_chars"}, defaults={"max_chars": "10000"})
+_reg_register("read_pdf", tool_read_pdf, arg_map={"path": "path", "max_chars": "max_chars"}, defaults={"max_chars": 10000})
 
 # F9 — Gouverneur de coût (défini dans tools.json, dispatch dans cost_governor.py)
 from tools.cost_governor import cost_governor_dispatch as _cost_governor_dispatch
