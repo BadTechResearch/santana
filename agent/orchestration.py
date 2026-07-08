@@ -48,14 +48,14 @@ def _load_failures() -> dict:
     """Charge l'état depuis SQLite (metrics.db)."""
     with _STATE_LOCK:
         try:
-        conn = get_metrics_db()
-        c = conn.cursor()
-        c.execute("SELECT value FROM tool_state WHERE key=?", (STATE_KEY,))
-        row = c.fetchone()
-        if row:
-            return json.loads(row[0])
-    except Exception as e:
-        logger.warning("[ORCHESTRATION] Load failures error: %s", e)
+            conn = get_metrics_db()
+            c = conn.cursor()
+            c.execute("SELECT value FROM tool_state WHERE key=?", (STATE_KEY,))
+            row = c.fetchone()
+            if row:
+                return json.loads(row[0])
+        except Exception as e:
+            logger.warning("[ORCHESTRATION] Load failures error: %s", e)
     return {"outils": {}, "reparations": []}
 
 
