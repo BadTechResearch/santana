@@ -26,6 +26,7 @@ import json
 import logging
 import os
 import threading
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -146,6 +147,30 @@ def record_usage(prompt_tokens: int, completion_tokens: int,
         cout["cout_total"], _state["cout_cumule_reel"],
         _state["total_appels_reussis"], cout["taux_cache"],
     )
+
+    # Persister dans metrics.db pour le suivi mensuel
+    try:
+        from core.db import get_metrics_db
+        _mois = datetime.utcnow().strftime("%Y-%m")
+        _conn = get_metrics_db()
+        _conn.execute(
+            "INSERT OR REPLACE INTO metrics "
+            "(mois, provider, tokens_prompt, tokens_completion, cout, appels) "
+            "VALUES (?, ?, "
+            "  COALESCE((SELECT tokens_prompt FROM metrics WHERE mois=? AND provider=?), 0) + ?, "
+            "  COALESCE((SELECT tokens_completion FROM metrics WHERE mois=? AND provider=?), 0) + ?, "
+            "  COALESCE((SELECT cout FROM metrics WHERE mois=? AND provider=?), 0.0) + ?, "
+            "  COALESCE((SELECT appels FROM metrics WHERE mois=? AND provider=?), 0) + 1"
+            ")",
+            (_mois, provider_name,
+             _mois, provider_name, prompt_tokens,
+             _mois, provider_name, completion_tokens,
+             _mois, provider_name, cout["cout_total"],
+             _mois, provider_name)
+        )
+        _conn.commit()
+    except Exception as _me:
+        logger.error("[COST] Échec persistence metrics.db: %s", _me)
 
 
 def estimate_cost_from_messages(messages: list, max_output_tokens: int = 0) -> float:

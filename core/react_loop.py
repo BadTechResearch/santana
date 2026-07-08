@@ -426,6 +426,7 @@ async def react_loop(user_message: str,
 
     iteration = 0
     last_content = ""
+    _last_tokens = 0
     _last_tool_error = [0, ""]   # [count, last_tool_name] — détection boucle outil
     use_stream = stream_callback is not None
     is_self_query = any(kw in user_message.lower()
@@ -528,8 +529,9 @@ async def react_loop(user_message: str,
                         prompt_tokens=_usage.get('prompt_tokens', 0),
                         completion_tokens=_usage.get('completion_tokens', 0),
                         cached_tokens=_usage.get('prompt_cache_hit_tokens', 0),
-                        provider_name='deepseek'
+                        provider_name=actual_provider
                     )
+                    _last_tokens = _usage.get('prompt_tokens', 0) + _usage.get('completion_tokens', 0)
                 except Exception as _ue:
                     logging.error(f"[COST] record_usage error: {_ue}")
 
@@ -738,7 +740,7 @@ async def react_loop(user_message: str,
     if _stats is not None:
         _stats['tool_count'] = len(_tools_called)
         _stats['provider'] = get_active_provider()
-        _stats['token_count'] = 0  # approximé dans evaluate
+        _stats['token_count'] = _last_tokens  # tokens réels du dernier appel LLM
 
     # Livrer le dernier contenu généré (ou un message utile si vide)
     if last_content:

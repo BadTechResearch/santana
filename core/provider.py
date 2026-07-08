@@ -322,6 +322,7 @@ def complete_stream(messages, model=None, max_tokens=32000, tools=None, tool_cho
                     "messages": truncated,
                     "max_tokens": p_max_tokens,
                     "stream": True,
+                    "stream_options": {"include_usage": True},
                 }
                 if tools:
                     body["tools"] = tools
@@ -346,6 +347,7 @@ def complete_stream(messages, model=None, max_tokens=32000, tools=None, tool_cho
                     reasoning = ""
                     tool_calls_parts = {}
                     finish_reason = "stop"
+                    response_usage = {}
 
                     for line in resp.iter_lines(decode_unicode=True):
                         if not line:
@@ -363,6 +365,11 @@ def complete_stream(messages, model=None, max_tokens=32000, tools=None, tool_cho
 
                         choices = chunk.get("choices", [])
                         if not choices:
+                            # DeepSeek renvoie l'usage dans le dernier chunk SSE
+                            # {"choices":[], "usage":{...}} avant [DONE]
+                            usage_data = chunk.get("usage")
+                            if usage_data:
+                                response_usage = usage_data
                             continue
 
                         delta = choices[0].get("delta", {})
@@ -418,6 +425,7 @@ def complete_stream(messages, model=None, max_tokens=32000, tools=None, tool_cho
                     yield {'type': 'complete', 'content': resolved_content,
                            'finish_reason': finish_reason,
                            'tool_calls': tool_calls,
+                           'usage': response_usage,
                            'reasoning_content': reasoning or None}
                 return  # succès → sortir du provider loop
 
