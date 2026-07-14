@@ -163,6 +163,7 @@ santana/
 | Document | Description |
 |----------|-------------|
 | **📖 [ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Full technical architecture — stack, services, data flow, memory layers |
+| **🤖 [AGENTS.md](AGENTS.md)** | AI agent rules — Karpathy-inspired constraints for LLM agents working on Santana |
 | **🤝 [CONTRIBUTING.md](CONTRIBUTING.md)** | How to contribute, set up a dev environment, run tests, submit PRs |
 | **🔒 [SECURITY.md](SECURITY.md)** | Security policy, vulnerability reporting, and built-in security measures |
 | **📜 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** | Community guidelines — be respectful, constructive, and inclusive |
