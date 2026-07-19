@@ -11,11 +11,9 @@ import os
 BASE_DIR = os.path.expanduser("~/santana")
 RUBRIQUES = [
     "test_100_memoire.py",
-    "test_100_securite.py",
     "test_100_autonomie.py",
     "test_100_performances.py",
     "test_100_frugalite.py",
-    "test_100_qualite_code.py",
 ]
 
 

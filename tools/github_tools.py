@@ -10,6 +10,7 @@ Usage :
   github_list_files("santana", "tools/")   → liste fichiers d'un dossier
   github_read("santana", "santana.py")     → lit un fichier
   github_write("santana", "foo.py", "...") → écrit/commit/push
+  github_push("santana")                   → push commits locaux en attente
   github_delete_file("santana", "old.py")  → supprime un fichier
   github_create_repo("nouveau-projet")     → crée un repo
   github_create_branch("santana", "feature/x") → crée une branche
@@ -398,6 +399,66 @@ def tool_github_write(repo: str, path: str, content: str, message: str = "") -> 
         return f"❌ Erreur Git: {err}"
 
 
+
+@track()
+def tool_github_push(repo: str) -> str:
+    """Pousse les commits locaux en attente vers GitHub.
+
+    Utile quand un commit a ete fait localement (via github_write ou manuellement)
+    mais que le push n'a pas eu lieu (timeout, erreur reseau, etc.).
+    Utilise _git() directement (pas de sandbox reseau) pour le push.
+
+    Args:
+        repo: Nom du depot (ex: santana)
+    """
+    clean = _clean_repo_name(repo)
+    try:
+        repo_path = _ensure_repo(repo)
+    except RuntimeError as e:
+        return f"\u274c Impossible d'acceder au depot '{clean}': {e}"
+
+    # Verifier s'il y a des commits a pousser
+    try:
+        status_result = _git(["status", "--porcelain", "-b"], cwd=repo_path, timeout=10)
+        status_lines = status_result.stdout.strip().split("\n")
+
+        ahead = 0
+        for line in status_lines:
+            if line.startswith("##") and "ahead" in line:
+                import re as _re
+                match = _re.search(r"ahead\s+(\d+)", line)
+                if match:
+                    ahead = int(match.group(1))
+                break
+
+        if ahead == 0:
+            return f"\u2139\ufe0f Rien a pousser - '{clean}' est a jour avec origin."
+    except RuntimeError as e:
+        logging.warning(f"[GITHUB] Status check echoue pour {clean}: {e}")
+
+    try:
+        _git(["push"], cwd=repo_path, timeout=60)
+
+        hash_result = _git(["rev-parse", "HEAD"], cwd=repo_path, timeout=5)
+        commit_hash = hash_result.stdout.strip()[:12]
+
+        ahead_msg = f" ({ahead} commit{'s' if ahead > 1 else ''})" if ahead > 0 else ""
+        return (
+            f"\u2705 Push reussi sur '{clean}'{ahead_msg}\n"
+            f"\U0001f517 HEAD: `{commit_hash}`"
+        )
+    except RuntimeError as e:
+        err = str(e)
+        if "Connection refused" in err or "Could not connect" in err or "Network is unreachable" in err:
+            return (
+                f"\u274c Push echoue sur '{clean}' - reseau injoignable.\n"
+                f"   Detail: {err}\n\n"
+                f"\U0001f4a1 Les commits sont enregistres LOCALEMENT dans {repo_path}\n"
+                f"   Lance github_push('{repo}') plus tard quand le reseau sera disponible."
+            )
+        return f"\u274c Erreur push sur '{clean}': {err}"
+
+
 @track()
 def tool_github_delete_file(repo: str, path: str, message: str = "") -> str:
     """Supprime un fichier d'un dépôt GitHub (commit + push).
@@ -574,6 +635,7 @@ def register_all():
               defaults={"max_chars": 15000})
     _reg_register("github_write",         tool_github_write,         arg_map={"repo": "repo", "path": "path", "content": "content", "message": "message"},
               defaults={"message": ""})
+    _reg_register("github_push",          tool_github_push,          arg_map={"repo": "repo"})
     _reg_register("github_delete_file",   tool_github_delete_file,   arg_map={"repo": "repo", "path": "path", "message": "message"},
               defaults={"message": ""})
     _reg_register("github_create_repo",   tool_github_create_repo,   arg_map={"name": "name", "description": "description", "private": "private"},
@@ -585,4 +647,4 @@ def register_all():
     _reg_register("github_merge_pr",      tool_github_merge_pr,      arg_map={"repo": "repo", "pull_number": "pull_number", "commit_title": "commit_title"},
               defaults={"commit_title": ""})
 
-    logging.info("[GITHUB] 10 outils enregistrés : github_list_repos, github_list_branches, github_list_files, github_read, github_write, github_delete_file, github_create_repo, github_create_branch, github_create_pr, github_merge_pr")
+    logging.info("[GITHUB] 11 outils enregistrés : github_list_repos, github_list_branches, github_list_files, github_read, github_write, github_push, github_delete_file, github_create_repo, github_create_branch, github_create_pr, github_merge_pr")

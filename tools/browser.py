@@ -5,6 +5,7 @@ Playwright = moteur Chromium headless intégré, sans dépendance externe."""
 import os
 import logging
 import tempfile
+import time
 from typing import Optional
 from core.utils import get_base_dir
 
@@ -15,21 +16,27 @@ SCREENSHOT_DIR = os.path.join(BASE_DIR, "screenshots")
 _BROWSER = None
 _CONTEXT = None
 _PAGE = None
+_BROWSER_LAST_ACTIVE = 0      # Timestamp dernière utilisation (pour idle timeout)
+_BROWSER_IDLE_TIMEOUT = 300    # 5 min d'inactivité → fermeture automatique
 
 
 def _get_page():
     """Retourne une page Playwright réutilisable (lazy init)."""
-    global _BROWSER, _CONTEXT, _PAGE
+    global _BROWSER, _CONTEXT, _PAGE, _BROWSER_LAST_ACTIVE
+
+    # Idle timeout : fermer le browser s'il est inactif depuis trop longtemps
+    if _BROWSER is not None and time.time() - _BROWSER_LAST_ACTIVE > _BROWSER_IDLE_TIMEOUT:
+        logging.info(f"[BROWSER] Idle timeout ({_BROWSER_IDLE_TIMEOUT}s) — fermeture")
+        _cleanup()
+
     if _PAGE is not None:
         # Vérifier que la page est encore ouverte
         try:
             _PAGE.title()
             return _PAGE
         except Exception:
-            logging.info("[BROWSER] Page fermée, réinitialisation...")
-            _PAGE = None
-            _CONTEXT = None
-            _BROWSER = None
+            logging.info("[BROWSER] Page fermée, nettoyage avant réinitialisation...")
+            _cleanup()  # ← FERME proprement l'ancien navigateur avant d'en créer un nouveau
 
     try:
         from playwright.sync_api import sync_playwright
@@ -53,6 +60,7 @@ def _get_page():
         )
         _PAGE = _CONTEXT.new_page()
         logging.info("[BROWSER] Navigateur initialisé (Chromium headless)")
+        _BROWSER_LAST_ACTIVE = time.time()
         return _PAGE
     except Exception as e:
         logging.error(f"[BROWSER] Échec initialisation: {e}")
@@ -106,6 +114,7 @@ def browser_navigate(url: str, timeout: int = 30) -> str:
 
         result = f"[{title}]\n{cleaned}" if title else cleaned
         logging.info(f"[BROWSER] Navigué: {url} → {len(cleaned)} chars")
+        _BROWSER_LAST_ACTIVE = time.time()
         return result
 
     except Exception as e:
@@ -149,6 +158,7 @@ def browser_screenshot(url: str, timeout: int = 35) -> str:
 
         page.screenshot(path=path, full_page=False)
         logging.info(f"[BROWSER] Screenshot: {url} → {path}")
+        _BROWSER_LAST_ACTIVE = time.time()
         return f"Capture: {path}"
 
     except Exception as e:

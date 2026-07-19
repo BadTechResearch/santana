@@ -50,6 +50,7 @@ from core.delegate import delegate_task as _delegate_task_async
 # ─── Nouveaux outils (Playwright + PDF) ───────────────────────────────────
 from tools.browser import browser_navigate, browser_screenshot
 from tools.pdf_reader import read_pdf as _read_pdf_raw
+from tools.fts_search import fts_memory_search  # Phase 4 — FTS5
 
 # ─── Modules @tool : enregistrement automatique via décorateur ───────────
 # Chaque import déclenche les décorateurs @tool() qui s'enregistrent
@@ -389,6 +390,7 @@ _reg_register("skill_manage", _skill_manage, arg_map={"action": "action", "name"
 _reg_register("skill_list", _skill_list, arg_map={})
 _reg_register("delegate_task", tool_delegate_task, arg_map={"goal": "goal", "context": "context"}, defaults={"context": ""})
 _reg_register("read_pdf", tool_read_pdf, arg_map={"path": "path", "max_chars": "max_chars"}, defaults={"max_chars": 10000})
+_reg_register("fts_memory", fts_memory_search, arg_map={"query": "query", "limit": "limit"}, defaults={"limit": "5"})
 
 # F9 — Gouverneur de coût (défini dans tools.json, dispatch dans cost_governor.py)
 from tools.cost_governor import cost_governor_dispatch as _cost_governor_dispatch

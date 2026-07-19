@@ -31,7 +31,7 @@ PROVIDER_CONFIGS = {
     "deepseek": {
         "label":           "DeepSeek",
         "max_payload_chars": 4_000_000,   # DeepSeek gère 1M tokens sans limite HTTP
-        "max_tokens":      32000,          # génération longue possible
+        "max_tokens":      128000,          # génération longue possible
         "retry_count":     2,              # 2 tentatives avant fallback
         "retry_delay":     1.0,            # secondes, doublé à chaque retry
         "context_window":  1_000_000,      # tokens

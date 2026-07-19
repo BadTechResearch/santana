@@ -22,7 +22,7 @@ DEEPSEEK_PRO_MODEL = os.getenv('DEEPSEEK_PRO_MODEL', 'deepseek-v4-pro').strip()
 DEEPSEEK_KEY = os.getenv('DEEPSEEK_API_KEY', '').strip()
 
 
-def complete(messages, model=None, max_tokens=32000,
+def complete(messages, model=None, max_tokens=128000,
              tools=None, tool_choice='auto',
              provider='deepseek', timeout=120):
     """Appel LLM synchrone (délègue à core.provider)."""
@@ -32,7 +32,7 @@ def complete(messages, model=None, max_tokens=32000,
     )
 
 
-def complete_stream(messages, model=None, max_tokens=32000,
+def complete_stream(messages, model=None, max_tokens=128000,
                     tools=None, tool_choice='auto',
                     provider='deepseek', timeout=120):
     """Appel LLM streaming (délègue à core.provider)."""

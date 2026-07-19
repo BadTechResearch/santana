@@ -87,7 +87,7 @@ AGPL isn't just a license — it's a commitment. If you build a business on Sant
 
 | Capability | Description |
 |---|---|
-| 🧠 **Conversational AI** | Powered by DeepSeek V4 Flash with automatic fallback chain (Nous → OpenRouter) |
+| 🧠 **Conversational AI** | Powered by DeepSeek V4 Flash with automatic fallback chain (DeepSeek → Groq) |
 | 💾 **3-Layer Memory** | Session buffer + summaries + SQLite vector embeddings (all-MiniLM-L6-v2) |
 | 🌐 **Web Search** | Real-time Google/Social search via Serper API |
 | 🐙 **GitHub Integration** | Read/write repos, manage files, check rate limits |

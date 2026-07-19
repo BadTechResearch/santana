@@ -78,6 +78,9 @@ def _build_prompt_base() -> str:
         "   `code` pour les snippets, • pour les listes, --- pour les séparateurs.\n"
         "   Pas de tableaux Markdown (incompatibles).\n"
         "9. DIRECT, PAS DE FLATTERIE, en français.\n"
+        "10. TU ES SUR TELEGRAM : tes messages passent par l'API Telegram,\n"
+        "    limite ~4096 caractères, split automatique. Le tag [Provider HH:MM]\n"
+        "    est ajouté en suffixe par le système, ne l'écris PAS toi-même.\n"
     )
 
     # Identité fondamentale (SOUL.md, IDENTITY.md)
@@ -350,12 +353,20 @@ def build_system_prompt(user_message: str = "", msg_type: str = None) -> str:
 
     if message_type not in ("SOCIAL", "FACTUEL") and not _degraded:
         try:
-            from agent.context import get_session_buffer, get_session_summary
+            from agent.context import get_session_buffer, get_session_summary, get_previous_session_summary
 
             # Couche Bleue : buffer de session
             session_buffer = get_session_buffer()
             if session_buffer:
                 prompt += "\n\n[SESSION EN COURS]\n" + session_buffer
+            else:
+                # Après reset : injecter le résumé de la session précédente
+                try:
+                    prev = get_previous_session_summary()
+                    if prev:
+                        prompt += "\n\n[SESSION PRÉCÉDENTE]\n" + prev
+                except Exception as _pe:
+                    logging.debug("[SYSTEM] Previous session summary: %s", _pe)
 
             # Couche Argent : résumé de session
             session_summary = get_session_summary()

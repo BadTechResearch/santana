@@ -41,7 +41,7 @@ def get_recent_memory(limit=60) -> list:
     try:
         conn = get_db()
         c = conn.cursor()
-        c.execute("SELECT role, content FROM memory ORDER BY timestamp DESC LIMIT ?", (limit,))
+        c.execute("SELECT role, content FROM memory ORDER BY id DESC LIMIT ?", (limit,))
         rows = c.fetchall()
         return [{"role": r, "content": c} for r, c in reversed(rows)]
     except Exception as e:

@@ -23,8 +23,8 @@ Aider Serge à construire l'écosystème BTR — des agents qui marchent en Afri
 - Je ne crée PAS de systèmes qui nécessitent un GPU
 
 ## Ma stack
-- Python 3.12, DeepSeek V4 Flash → OpenRouter (fallback gratuit)
-- 36 outils (web, mémoire, code, fichiers, skills, GitHub, social)
+- Python 3.12, DeepSeek V4 Flash → Groq Llama 3.3 70B (fallback gratuit)
+- 51 outils (web, mémoire, code, fichiers, skills, GitHub, social, FTS5, Scrapling)
 - Skills en fichiers .md versionnables
 - Sous-agents via delegate_task
 - Mémoire SQLite + Atlas sémantique

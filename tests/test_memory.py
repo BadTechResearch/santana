@@ -14,10 +14,14 @@ import core.db
 _ORIG_DB_PATH = core.db.DB_PATH
 
 from memory import memory as mem_mod
-mem_mod.BASE_DIR = TEST_DIR
 
 
 def setup_module():
+    global _ORIG_BASE_DIR
+    _ORIG_BASE_DIR = mem_mod.BASE_DIR
+    mem_mod.BASE_DIR = TEST_DIR
+    # Fermer toute connexion résiduelle d'un module précédent
+    core.db.close_db()
     os.makedirs(TEST_DIR, exist_ok=True)
     # Pointer DB_PATH vers TEST_DB pour ce module
     core.db.DB_PATH = TEST_DB
@@ -47,13 +51,11 @@ def setup_module():
 
 def teardown_module():
     import shutil
-    try:
-        core.db.close_db()
-    except Exception:
-        pass
-    shutil.rmtree(TEST_DIR, ignore_errors=True)
-    # Restaurer DB_PATH original
+    core.db.close_db()
+    # Restaurer DB_PATH et BASE_DIR originaux AVANT rm tree
     core.db.DB_PATH = _ORIG_DB_PATH
+    mem_mod.BASE_DIR = _ORIG_BASE_DIR
+    shutil.rmtree(TEST_DIR, ignore_errors=True)
 
 
 class TestMemory:

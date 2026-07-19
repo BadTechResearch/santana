@@ -85,7 +85,7 @@ def _notifier_serge(message: str) -> bool:
             logger.warning("[ORCHESTRATION] Notif Serge impossible: TELEGRAM_TOKEN/CHAT_ID absent")
             return False
         url = f"https://api.telegram.org/bot{token}/sendMessage"
-        data = json.dumps({"chat_id": int(chat_id), "text": message, "parse_mode": "MarkdownV2"}).encode()
+        data = json.dumps({"chat_id": int(chat_id), "text": message, "parse_mode": "HTML"}).encode()
         req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=10) as r:
             ok = json.loads(r.read()).get("ok", False)

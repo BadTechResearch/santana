@@ -50,10 +50,13 @@ _FLUSH_COUNTER = 0          # Nombre d'entrées depuis dernier flush
 # ─── Initialisation ────────────────────────────────────────────────────
 
 def init_session():
-    """Crée les tables de session si elles n'existent pas."""
-    global _INITIALIZED
-    if _INITIALIZED:
-        return
+    """Crée les tables de session si elles n'existent pas.
+
+    Sans garde _INITIALIZED : les tests changent DB_PATH entre les modules,
+    et le garde empêchait la recréation des tables sur la nouvelle DB.
+    CREATE TABLE IF NOT EXISTS est idempotent — l'exécuter à chaque appel
+    est sûr et trivial (< 1ms).
+    """
     try:
         conn = get_db()
         c = conn.cursor()
@@ -73,7 +76,6 @@ def init_session():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )''')
         conn.commit()
-        _INITIALIZED = True
     except Exception as e:
         logging.error(f"[CONTEXT] Session init failure: {e}")
 
@@ -304,13 +306,47 @@ def get_context() -> str:
 
 # ─── Reset de session ─────────────────────────────────────────────────
 
-def reset_session():
-    """Réinitialise le buffer, le compteur et force le flush SQLite."""
-    global SESSION_ID, MESSAGE_COUNTER, _INITIALIZED, _RAM_BUFFER, _FLUSH_COUNTER
+def reset_session(old_session_id: str = ""):
+    """Réinitialise le buffer, le compteur et force le flush SQLite.
+
+    Args:
+        old_session_id: SESSION_ID avant reset (pour injection résumé plus tard)
+    """
+    global SESSION_ID, MESSAGE_COUNTER, _INITIALIZED, _RAM_BUFFER, _FLUSH_COUNTER, _LAST_SESSION_ID
     # Flush avant reset
     _flush_to_sqlite()
+    _LAST_SESSION_ID = old_session_id or SESSION_ID
     _RAM_BUFFER.clear()
     SESSION_ID = datetime.now().strftime("%Y-%m-%d_%H")
     MESSAGE_COUNTER = 0
     _FLUSH_COUNTER = 0
     _INITIALIZED = False
+
+
+_LAST_SESSION_ID = SESSION_ID  # Sauvegardé par reset_session pour recherche
+
+
+def get_previous_session_summary() -> str:
+    """Retourne le résumé de la session PRÉCÉDENTE (celle d'avant le /reset)."""
+    try:
+        conn = get_db()
+        c = conn.cursor()
+        c.execute(
+            "SELECT summary FROM session_summaries WHERE session_id = ? LIMIT 1",
+            (_LAST_SESSION_ID,)
+        )
+        row = c.fetchone()
+        if row and row[0]:
+            return row[0][:500]
+        # Fallback : n'importe quelle session sauf la courante
+        c.execute(
+            "SELECT summary FROM session_summaries WHERE session_id != ? "
+            "ORDER BY created_at DESC LIMIT 1",
+            (SESSION_ID,)
+        )
+        row = c.fetchone()
+        return row[0][:500] if row and row[0] else ""
+    except Exception as e:
+        logging.error(f"[CONTEXT] Previous summary fetch failure: {e}")
+        return ""
+

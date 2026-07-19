@@ -29,6 +29,8 @@ from agent.context import (
 
 
 def setup_module():
+    # Fermer toute connexion résiduelle d'un module précédent
+    core.db.close_db()
     os.makedirs(TEST_DIR, exist_ok=True)
     # Pointer DB_PATH vers TEST_DB pour ce module
     core.db.DB_PATH = TEST_DB
@@ -37,14 +39,11 @@ def setup_module():
 
 def teardown_module():
     import shutil
-    shutil.rmtree(TEST_DIR, ignore_errors=True)
-    # Restaurer DB_PATH et get_db originaux
+    core.db.close_db()
+    # Restaurer DB_PATH et get_db originaux AVANT rm tree
     core.db.DB_PATH = _ORIG_DB_PATH
     core.db.get_db = _ORIG_GET_DB
-    try:
-        core.db.close_db()
-    except Exception:
-        pass
+    shutil.rmtree(TEST_DIR, ignore_errors=True)
 
 
 class TestInit:

@@ -4,7 +4,12 @@ import os
 import logging
 import requests
 
-from ddgs import DDGS
+try:
+    from ddgs import DDGS
+    _DDGS_AVAILABLE = True
+except ImportError:
+    _DDGS_AVAILABLE = False
+    DDGS = None
 
 
 def _serper_search(query: str) -> str | None:
@@ -37,6 +42,9 @@ def _ddg_search_api(query: str, max_results: int = 6) -> str | None:
 
     Utilise duckduckgo_search (lib maintenue, pas de scraping HTML).
     """
+    if not _DDGS_AVAILABLE:
+        logging.debug("[WEB_SEARCH] ddgs non disponible, skip DuckDuckGo")
+        return None
     try:
         with DDGS() as ddgs:
             results = list(ddgs.text(query, region="fr-fr", safesearch="off", max_results=max_results))

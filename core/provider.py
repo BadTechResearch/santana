@@ -225,7 +225,7 @@ def _call_with_retry(provider: dict, fn, *args, **kwargs):
     raise last_error or RuntimeError(f"{provider['name']} indisponible")
 
 
-def complete(messages, model=None, max_tokens=32000, tools=None, tool_choice='auto', timeout=120):
+def complete(messages, model=None, max_tokens=128000, tools=None, tool_choice='auto', timeout=120):
     """Appel LLM bloquant — fallback sur chaque provider jusqu'au premier succès."""
     if not PROVIDER_CHAIN:
         _init_providers()
@@ -238,7 +238,7 @@ def complete(messages, model=None, max_tokens=32000, tools=None, tool_choice='au
             truncated = _truncate_messages(messages, provider["name"])
             # Utiliser le max_tokens adapté au provider si pas d'override
             p_config = pm.get_provider_config(provider["name"])
-            p_max_tokens = min(max_tokens, p_config["max_tokens"]) if max_tokens == 32000 else max_tokens
+            p_max_tokens = min(max_tokens, p_config["max_tokens"]) if max_tokens == 128000 else max_tokens
             return _call_with_retry(
                 provider, _provider_complete,
                 provider, truncated,
@@ -294,10 +294,11 @@ def _provider_complete(provider, messages, model, max_tokens, tools, tool_choice
             "tool_calls": msg.get("tool_calls"),
         },
         "finish_reason": finish_reason,
+        "usage": usage,
     }
 
 
-def complete_stream(messages, model=None, max_tokens=32000, tools=None, tool_choice='auto', timeout=120, **kwargs):
+def complete_stream(messages, model=None, max_tokens=128000, tools=None, tool_choice='auto', timeout=120, **kwargs):
     if kwargs:
         logger.debug(f"[STREAM] Ignored kwargs: {kwargs}")
     """Vrai streaming LLM — yield chaque token en temps réel via SSE."""
@@ -316,7 +317,7 @@ def complete_stream(messages, model=None, max_tokens=32000, tools=None, tool_cho
         for attempt in range(max_attempts):
             try:
                 truncated = _truncate_messages(messages, provider["name"])
-                p_max_tokens = min(max_tokens, p_config["max_tokens"]) if max_tokens == 32000 else max_tokens
+                p_max_tokens = min(max_tokens, p_config["max_tokens"]) if max_tokens == 128000 else max_tokens
                 headers = _provider_headers(provider)
                 body = {
                     "model": model or provider["model"],

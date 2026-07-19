@@ -31,13 +31,27 @@ _local = threading.local()
 
 
 def get_db() -> sqlite3.Connection:
-    """Retourne une connexion à memory.db (thread-local)."""
-    if not hasattr(_local, "conn") or _local.conn is None:
+    """Retourne une connexion à memory.db (thread-local).
+
+    Invalide et reconnecte automatiquement si DB_PATH a changé depuis
+    la dernière connexion (permet aux tests de changer DB_PATH sans
+    fuite de connexion vers l'ancien chemin).
+    """
+    _conn_path = getattr(_local, "_db_path", None)
+    if _conn_path != DB_PATH or not hasattr(_local, "conn") or _local.conn is None:
+        # DB_PATH a changé ou pas encore de connexion : fermer l'ancienne
+        if hasattr(_local, "conn") and _local.conn is not None:
+            try:
+                _local.conn.close()
+            except sqlite3.Error:
+                pass
+            _local.conn = None
         try:
             _local.conn = sqlite3.connect(DB_PATH)
             _local.conn.execute("PRAGMA journal_mode=WAL")
             _local.conn.execute("PRAGMA busy_timeout=5000")
             _local.conn.row_factory = sqlite3.Row
+            _local._db_path = DB_PATH
         except sqlite3.Error as e:
             logging.error(f"[DB] Erreur initialisation connexion: {e}")
             raise
@@ -45,13 +59,25 @@ def get_db() -> sqlite3.Connection:
 
 
 def get_metrics_db() -> sqlite3.Connection:
-    """Retourne une connexion à metrics.db avec auto-création des tables."""
-    if not hasattr(_local, "metrics_conn") or _local.metrics_conn is None:
+    """Retourne une connexion à metrics.db avec auto-création des tables.
+
+    Invalide et reconnecte automatiquement si METRICS_DB a changé depuis
+    la dernière connexion (cohérent avec get_db()).
+    """
+    _metrics_path = getattr(_local, "_metrics_path", None)
+    if _metrics_path != METRICS_DB or not hasattr(_local, "metrics_conn") or _local.metrics_conn is None:
+        if hasattr(_local, "metrics_conn") and _local.metrics_conn is not None:
+            try:
+                _local.metrics_conn.close()
+            except sqlite3.Error:
+                pass
+            _local.metrics_conn = None
         try:
             _local.metrics_conn = sqlite3.connect(METRICS_DB)
             _local.metrics_conn.execute("PRAGMA journal_mode=WAL")
             _local.metrics_conn.execute("PRAGMA busy_timeout=5000")
             _local.metrics_conn.execute("PRAGMA foreign_keys=ON")
+            _local._metrics_path = METRICS_DB
             # Créer toutes les tables au premier accès
             _init_metrics_tables(_local.metrics_conn)
         except sqlite3.Error as e:

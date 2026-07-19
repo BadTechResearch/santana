@@ -306,7 +306,9 @@
             "description": "Nombre max de lignes (defaut: 200)"
           }
         },
-        "required": ["path"]
+        "required": [
+          "path"
+        ]
       }
     }
   },
@@ -356,7 +358,9 @@
             "description": "Chemin dans le depot (defaut: racine)"
           }
         },
-        "required": ["repo"]
+        "required": [
+          "repo"
+        ]
       }
     }
   },
@@ -377,7 +381,10 @@
             "description": "Chemin du fichier"
           }
         },
-        "required": ["repo", "path"]
+        "required": [
+          "repo",
+          "path"
+        ]
       }
     }
   },
@@ -406,7 +413,12 @@
             "description": "Message de commit"
           }
         },
-        "required": ["repo", "path", "content", "message"]
+        "required": [
+          "repo",
+          "path",
+          "content",
+          "message"
+        ]
       }
     }
   },
@@ -420,7 +432,12 @@
         "properties": {
           "action": {
             "type": "string",
-            "enum": ["status", "report", "reset", "set_budget"],
+            "enum": [
+              "status",
+              "report",
+              "reset",
+              "set_budget"
+            ],
             "description": "Action (defaut: status)"
           },
           "budget": {
@@ -428,7 +445,9 @@
             "description": "Budget (pour set_budget, ex: 0.01)"
           }
         },
-        "required": ["action"]
+        "required": [
+          "action"
+        ]
       }
     }
   },
@@ -436,7 +455,7 @@
     "type": "function",
     "function": {
       "name": "youtube_info",
-      "description": "Extrait les metadonnees d'une video YouTube (titre, chaine, duree, description, date, vues). Peut aussi extraire la TRANSCRIPTION complete si include_transcript=true. Utilise yt-dlp sans telecharger la video.",
+      "description": "Extrait les metadonnees d'une video YouTube (titre, chaine, duree, description, date, vues). Peut aussi extraire la TRANSCRIPTION complete si include_transcript=true. Utilise yt-dlp sans telecharger la video. Deux modes de transcription : 'subtitles' (sous-titres YouTube natifs), 'whisper' (audio -> Whisper modele base), 'auto' (sous-titres puis fallback Whisper).",
       "parameters": {
         "type": "object",
         "properties": {
@@ -446,10 +465,16 @@
           },
           "include_transcript": {
             "type": "string",
-            "description": "Mettre 'true' pour obtenir la transcription complete de la video (sous-titres automatiques). Defaut: 'false'."
+            "description": "Mettre 'true' pour obtenir la transcription complete de la video. Defaut: 'false'."
+          },
+          "mode": {
+            "type": "string",
+            "description": "Mode de transcription: 'auto' (sous-titres YouTube puis Whisper si absent), 'subtitles' (sous-titres YouTube uniquement, defaut), 'whisper' (audio->Whisper force). Defaut: 'auto'."
           }
         },
-        "required": ["url"]
+        "required": [
+          "url"
+        ]
       }
     }
   },
@@ -470,7 +495,10 @@
             "description": "Contenu complet du fichier a ecrire"
           }
         },
-        "required": ["path", "content"]
+        "required": [
+          "path",
+          "content"
+        ]
       }
     }
   },
@@ -487,7 +515,9 @@
             "description": "Nom de la skill (sans .md)"
           }
         },
-        "required": ["name"]
+        "required": [
+          "name"
+        ]
       }
     }
   },
@@ -512,7 +542,10 @@
             "description": "Contenu complet (requis pour create et patch)"
           }
         },
-        "required": ["action", "name"]
+        "required": [
+          "action",
+          "name"
+        ]
       }
     }
   },
@@ -544,7 +577,9 @@
             "description": "Contexte additionnel (fichiers, contraintes, informations)"
           }
         },
-        "required": ["goal"]
+        "required": [
+          "goal"
+        ]
       }
     }
   },
@@ -565,7 +600,9 @@
             "description": "Nombre max de caracteres a extraire (defaut: 10000, max: 50000)"
           }
         },
-        "required": ["path"]
+        "required": [
+          "path"
+        ]
       }
     }
   },
@@ -577,10 +614,18 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "query": {"type": "string", "description": "Termes de recherche"},
-          "max_posts": {"type": "integer", "description": "Maximum de posts (defaut: 10, max: 20)"}
+          "query": {
+            "type": "string",
+            "description": "Termes de recherche"
+          },
+          "max_posts": {
+            "type": "integer",
+            "description": "Maximum de posts (defaut: 10, max: 20)"
+          }
         },
-        "required": ["query"]
+        "required": [
+          "query"
+        ]
       }
     }
   },
@@ -592,10 +637,18 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "query": {"type": "string", "description": "Termes de recherche"},
-          "max_posts": {"type": "integer", "description": "Maximum de videos (defaut: 10, max: 20)"}
+          "query": {
+            "type": "string",
+            "description": "Termes de recherche"
+          },
+          "max_posts": {
+            "type": "integer",
+            "description": "Maximum de videos (defaut: 10, max: 20)"
+          }
         },
-        "required": ["query"]
+        "required": [
+          "query"
+        ]
       }
     }
   },
@@ -607,11 +660,22 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "handle": {"type": "string", "description": "Nom du compte Twitter sans @ (ex: PresidenceRDC)"},
-          "query": {"type": "string", "description": "Filtre optionnel dans les tweets du compte"},
-          "max_tweets": {"type": "integer", "description": "Maximum de tweets (defaut: 5, max: 50)"}
+          "handle": {
+            "type": "string",
+            "description": "Nom du compte Twitter sans @ (ex: PresidenceRDC)"
+          },
+          "query": {
+            "type": "string",
+            "description": "Filtre optionnel dans les tweets du compte"
+          },
+          "max_tweets": {
+            "type": "integer",
+            "description": "Maximum de tweets (defaut: 5, max: 50)"
+          }
         },
-        "required": ["handle"]
+        "required": [
+          "handle"
+        ]
       }
     }
   },
@@ -623,10 +687,18 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "subreddit": {"type": "string", "description": "Nom du subreddit (sans r/)"},
-          "max_posts": {"type": "integer", "description": "Maximum de posts (defaut: 5, max: 50)"}
+          "subreddit": {
+            "type": "string",
+            "description": "Nom du subreddit (sans r/)"
+          },
+          "max_posts": {
+            "type": "integer",
+            "description": "Maximum de posts (defaut: 5, max: 50)"
+          }
         },
-        "required": ["subreddit"]
+        "required": [
+          "subreddit"
+        ]
       }
     }
   },
@@ -638,10 +710,18 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "username": {"type": "string", "description": "Nom d'utilisateur Instagram"},
-          "max_posts": {"type": "integer", "description": "Maximum de posts (defaut: 5, max: 20)"}
+          "username": {
+            "type": "string",
+            "description": "Nom d'utilisateur Instagram"
+          },
+          "max_posts": {
+            "type": "integer",
+            "description": "Maximum de posts (defaut: 5, max: 20)"
+          }
         },
-        "required": ["username"]
+        "required": [
+          "username"
+        ]
       }
     }
   },
@@ -653,10 +733,18 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "username": {"type": "string", "description": "Nom d'utilisateur TikTok"},
-          "max_posts": {"type": "integer", "description": "Maximum de videos (defaut: 5, max: 20)"}
+          "username": {
+            "type": "string",
+            "description": "Nom d'utilisateur TikTok"
+          },
+          "max_posts": {
+            "type": "integer",
+            "description": "Maximum de videos (defaut: 5, max: 20)"
+          }
         },
-        "required": ["username"]
+        "required": [
+          "username"
+        ]
       }
     }
   },
@@ -668,10 +756,18 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "query_search": {"type": "string", "description": "Termes de recherche"},
-          "max_tweets": {"type": "integer", "description": "Maximum de tweets (defaut: 10, max: 50)"}
+          "query_search": {
+            "type": "string",
+            "description": "Termes de recherche"
+          },
+          "max_tweets": {
+            "type": "integer",
+            "description": "Maximum de tweets (defaut: 10, max: 50)"
+          }
         },
-        "required": ["query_search"]
+        "required": [
+          "query_search"
+        ]
       }
     }
   },
@@ -683,11 +779,22 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "query": {"type": "string", "description": "Termes de recherche"},
-          "subreddit": {"type": "string", "description": "Sous-reddit specifique (optionnel)"},
-          "max_posts": {"type": "integer", "description": "Maximum de posts (defaut: 10, max: 50)"}
+          "query": {
+            "type": "string",
+            "description": "Termes de recherche"
+          },
+          "subreddit": {
+            "type": "string",
+            "description": "Sous-reddit specifique (optionnel)"
+          },
+          "max_posts": {
+            "type": "integer",
+            "description": "Maximum de posts (defaut: 10, max: 50)"
+          }
         },
-        "required": ["query"]
+        "required": [
+          "query"
+        ]
       }
     }
   },
@@ -699,11 +806,27 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "query": {"type": "string", "description": "Sujet de recherche"},
-          "platform": {"type": "string", "enum": ["all", "twitter", "reddit"], "description": "Plateforme (defaut: all)"},
-          "max_results": {"type": "integer", "description": "Maximum (defaut: 8, max: 15)"}
+          "query": {
+            "type": "string",
+            "description": "Sujet de recherche"
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "all",
+              "twitter",
+              "reddit"
+            ],
+            "description": "Plateforme (defaut: all)"
+          },
+          "max_results": {
+            "type": "integer",
+            "description": "Maximum (defaut: 8, max: 15)"
+          }
         },
-        "required": ["query"]
+        "required": [
+          "query"
+        ]
       }
     }
   },
@@ -715,10 +838,167 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "url": {"type": "string", "description": "URL complete a ouvrir"},
-          "timeout": {"type": "integer", "description": "Timeout en secondes (defaut: 20, max: 30)"}
+          "url": {
+            "type": "string",
+            "description": "URL complete a ouvrir"
+          },
+          "timeout": {
+            "type": "integer",
+            "description": "Timeout en secondes (defaut: 20, max: 30)"
+          }
         },
-        "required": ["url"]
+        "required": [
+          "url"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "code_modify",
+      "description": "MODIFIE le code source de Santana (tools/, agent/, core/, santana.py, tests/, etc.) avec backup automatique. Utilise APRES avoir lu le fichier avec fs_read.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Chemin relatif depuis ~/santana/ (ex: tools/mao.py, santana.py)"
+          },
+          "content": {
+            "type": "string",
+            "description": "NOUVEAU contenu complet du fichier (pas un diff, pas un patch, tout le fichier)"
+          }
+        },
+        "required": [
+          "path",
+          "content"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "code_list_sources",
+      "description": "Liste les fichiers sources Python de Santana par dossier. Utile avant code_modify pour v\u00e9rifier les noms exacts.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "directory": {
+            "type": "string",
+            "description": "Dossier relatif (ex: tools/, agent/, core/). Vide = tous."
+          }
+        },
+        "required": [
+          "directory"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "restart_self",
+      "description": "RED\u00c9MARRE Santana. Utilise APRES avoir modifi\u00e9 le code avec code_modify ou tool_create pour appliquer les changements.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "tool_create"
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "install_dependencies"
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "list_user_tools"
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "delete_user_tool"
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "github_list_repos"
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "github_list_branches"
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "github_push"
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "github_delete_file"
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "github_create_repo"
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "github_create_branch"
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "github_create_pr"
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "github_merge_pr"
+    }
+  },
+  {
+    "type": "function",
+    "function": {
+      "name": "fts_memory",
+      "description": "Recherche plein texte dans l'historique des conversations Santana. Utilise FTS5 pour chercher dans TOUS les echanges passes — memes les sessions archivees. Parfait pour retrouver une decision, un bug, une preference mentionnee il y a des jours ou des semaines. N'utilise PAS pour la session en cours (deja en contexte).",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Mots-cles, phrase exacte entre guillemets, ou expression booleenne (AND/OR/NOT)"
+          },
+          "limit": {
+            "type": "integer",
+            "description": "Nombre de resultats (defaut: 5, max: 20)",
+            "default": 5
+          }
+        },
+        "required": ["query"]
       }
     }
   }

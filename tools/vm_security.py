@@ -37,7 +37,7 @@ VM_EXEC_ALLOWLIST = frozenset({
     "git", "pytest", "systemctl", "journalctl",
     "rm",
     "curl", "wget", "ping",
-    "python3", "python",
+    "python3", "python", "pip",
     "apt", "apt-get", "dpkg",
 })
 

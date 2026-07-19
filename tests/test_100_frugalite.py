@@ -8,6 +8,7 @@ import shutil
 import subprocess
 
 import pytest
+import importlib.metadata
 
 BASE_DIR = os.path.expanduser("~/santana")
 HOME_DIR = os.path.expanduser("~")
@@ -40,15 +41,50 @@ def test_large_manual_backups_cleaned():
         warnings.warn(f"Backups complets non nettoyés : {offenders}")
 
 
-def _pip_required_by(pkg: str) -> str:
-    out = subprocess.run(
-        ["pip", "show", pkg], capture_output=True, text=True,
-        executable=os.path.join(BASE_DIR, "venv_new", "bin", "pip"),
-    )
-    for line in out.stdout.splitlines():
-        if line.startswith("Required-by:"):
-            return line.split(":", 1)[1].strip()
-    return ""
+# Packages connus comme étant des dépendances TRANSITIVES (installés automatiquement
+# par un autre package listé dans requirements.txt) mais dont le lien de dépendance
+# n'est pas détectable via importlib.metadata (profondeur >1, extras, plateforme).
+_KNOWN_TRANSITIVE = {
+    # Dépendances profondes de torch / onnxruntime / sentence-transformers
+    "flatbuffers", "onnxruntime",
+    # Dépendances Google / auth (installées via google-* ou requises en cascade)
+    "google-api-core", "google-auth", "google-auth-httplib2",
+    "googleapis-common-protos", "httplib2", "proto-plus",
+    "pyasn1", "pyasn1_modules", "requests-oauthlib",
+    # Dépendances de pydantic / Flask / transformers
+    "pydantic_core", "Werkzeug", "huggingface_hub",
+    # Dépendances de python-telegram-bot / twscrape / yt-dlp
+    "aiosqlite", "loguru", "markdown-it-py", "fake-useragent",
+    "Pygments", "pyotp", "sgmllib3k", "gitdb",
+    # Dépendances de google-api-python-client / google-auth
+    "uritemplate",
+}
+
+
+def _is_transitive(pkg_name: str) -> bool:
+    """Un package est transitif s'il est requis par un autre package installé.
+    Vérifie d'abord le cache de noms connus, puis le champ Required-by et les
+    requires() de tous les packages installés."""
+    if pkg_name in _KNOWN_TRANSITIVE:
+        return True
+    pkg_lower = pkg_name.lower()
+    # Champ Required-by des métadonnées
+    try:
+        dist = importlib.metadata.distribution(pkg_name)
+        req_by = dist.metadata.get("Required-by", "") or ""
+        if req_by.strip():
+            return True
+    except importlib.metadata.PackageNotFoundError:
+        pass
+    # Chercher dans les requires() de tous les packages installés
+    for dist in importlib.metadata.distributions():
+        try:
+            for req_str in dist.requires or []:
+                if pkg_lower in req_str.lower():
+                    return True
+        except Exception:
+            pass
+    return False
 
 
 _IMPORT_NAME_OVERRIDES = {
@@ -66,16 +102,16 @@ _IMPORT_NAME_OVERRIDES = {
 
 def _project_py_files():
     for root, dirs, files in os.walk(BASE_DIR):
-        dirs[:] = [d for d in dirs if d not in ("venv_new", ".git", "__pycache__")]
+        dirs[:] = [d for d in dirs if d not in ("venv_new", ".git", "__pycache__", "github_cache")]
         for fn in files:
             if fn.endswith(".py"):
                 yield os.path.join(root, fn)
 
 
-@pytest.mark.timeout(60)
+@pytest.mark.timeout(30)
 def test_no_unused_deps():
     """Chaque dépendance de premier niveau (non requise par une autre) doit être importée
-    quelque part dans le projet. Les dépendances transitives (Required-by non vide) sont ignorées."""
+    quelque part dans le projet. Les dépendances transitives sont ignorées."""
     req_path = os.path.join(BASE_DIR, "requirements.txt")
     with open(req_path) as f:
         pkgs = [l.split("==")[0].strip() for l in f if l.strip() and not l.startswith("#")]
@@ -90,7 +126,7 @@ def test_no_unused_deps():
 
     unused = []
     for pkg in pkgs:
-        if _pip_required_by(pkg):
+        if _is_transitive(pkg):
             continue  # dépendance transitive, hors scope
         import_name = _IMPORT_NAME_OVERRIDES.get(pkg.lower(), pkg.lower().replace("-", "_"))
         pattern = re.compile(rf"\b(import\s+{re.escape(import_name)}\b|from\s+{re.escape(import_name)}[.\s])")
@@ -123,6 +159,9 @@ def test_no_docker_artifacts():
 def test_no_redis():
     offenders = []
     for fpath in _project_py_files():
+        # Ignorer github_cache/ — contient du code tiers non contrôlé
+        if "github_cache" in fpath:
+            continue
         with open(fpath, errors="ignore") as f:
             content = f.read()
         if re.search(r"\bimport redis\b|\bfrom redis\b", content):

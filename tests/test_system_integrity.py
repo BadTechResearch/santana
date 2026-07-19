@@ -219,7 +219,7 @@ def test_cost_governor_single_budget_source():
     # tests/ exclu : ce fichier de test mentionne lui-même la chaîne "DEEPSEEK_COST_LIMIT"
     # dans ses docstrings/assertions, ce qui produirait un faux positif auto-référentiel.
     for root, dirs, files in os.walk(BASE_DIR):
-        dirs[:] = [d for d in dirs if d not in ("venv_new", ".git", "__pycache__", "tests", "backup")]
+        dirs[:] = [d for d in dirs if d not in ("venv_new", ".git", "__pycache__", "tests", "backup", "github_cache")]
         for fname in files:
             if not fname.endswith(".py"):
                 continue
@@ -602,4 +602,70 @@ def test_no_other_dangling_function_imports_in_project():
                             f"{module_name} (l.{node.lineno}) importe {node.module}.{alias.name} "
                             f"qui n'existe pas"
                         )
-    assert not failures, "Imports internes cassés détectés :\n" + "\n".join(failures)
+    assert not failures, "Imports internes cassés détectés :\\n" + "\\n".join(failures)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# 8. RÉSILIENCE NoneType — le guard handle_message ne doit pas régresser
+# ═══════════════════════════════════════════════════════════════════════════
+
+def test_handle_message_guard_none_type():
+    """Vérifie que le guard NoneType a bien été placé dans handle_message()
+    et n'a pas été retiré ou commenté par inadvertance.
+
+    Contexte : santana.py l.199-204. Sans ce guard, les updates non-texte
+    (edited_message, callback_query, channel_post) passent par MessageHandler
+    mais ont update.message = None → AttributeError: 'NoneType' object has
+    no attribute 'text'. Ce bug causait ~58 crashes/24h avant correction.
+
+    Approche : AST statique. N'importe PAS santana.py (qui a un lock fichier
+    exclusif au niveau module + alerte crash_flag).
+    """
+    santana_path = os.path.join(BASE_DIR, "santana.py")
+    assert os.path.isfile(santana_path), f"{santana_path} introuvable"
+
+    with open(santana_path) as f:
+        tree = ast.parse(f.read(), filename=santana_path)
+
+    # Trouver la fonction handle_message (async def)
+    handle_fn = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.AsyncFunctionDef) and node.name == "handle_message":
+            handle_fn = node
+            break
+
+    assert handle_fn is not None, (
+        "async def handle_message() introuvable dans santana.py"
+    )
+
+    # Reconstituer le corps de handle_message en texte pour inspection.
+    # On part du début de la fonction (handle_fn.lineno = la ligne "async def")
+    # pour capturer aussi les commentaires-header qui précèdent la 1ère instruction.
+    with open(santana_path) as f:
+        all_lines = f.readlines()
+    first_line = handle_fn.lineno - 1  # 0-indexé
+    last_body_line = max(
+        (getattr(stmt, "end_lineno", stmt.lineno) for stmt in handle_fn.body),
+        default=handle_fn.lineno,
+    )
+    body_source = "".join(all_lines[first_line:last_body_line])
+
+    # Conditions du guard
+    guards = [
+        "if not update.message" in body_source,
+        "update.message.text" in body_source,
+        "#" in body_source and "Guard" in body_source,
+    ]
+
+    missing = [g for g in guards if not g]
+    assert not missing, (
+        "Le guard NoneType dans handle_message() semble avoir été retiré ou modifié."
+        f" Vérifications échouées : {missing}. "
+        "Ce guard est CRITIQUE — sans lui, tout update non-texte (edited_message, "
+        "callback_query) crashe Santana avec AttributeError: 'NoneType' object "
+        "has no attribute 'text'."
+    )
+    assert body_source.count("update.message") >= 2, (
+        "Le guard devrait référencer update.message au moins 2 fois "
+        "(condition + logging)"
+    )

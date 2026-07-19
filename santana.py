@@ -4,7 +4,7 @@
 
 import os, json, logging, asyncio, fcntl, signal, sys, time, subprocess
 from datetime import datetime
-import pytz; _TZ = pytz.timezone("Africa/Kinshasa")
+from datetime import timezone, timedelta; _TZ = timezone(timedelta(hours=1))
 from core.utils import get_base_dir
 
 BASE_DIR = get_base_dir()
@@ -143,13 +143,7 @@ async def reset_command(update: Update, context):
         _cost_reset()
         _reset_context_session()
         _reset_react_state()
-        # Nettoyer la mémoire récente (SQLite)
-        try:
-            from memory.memory import clear_short_term
-            clear_short_term()
-        except Exception:
-            pass
-        # Nettoyer les patterns enregistrés
+        # Les interactions patterns sont nettoyées (pas la mémoire persistante)
         try:
             from agent.patterns import clear_interactions
             clear_interactions()
@@ -196,6 +190,12 @@ async def audit_command(update: Update, context):
 
 
 async def handle_message(update: Update, context):
+    # 🔴 Guard : les updates non-texte (edited_message, callback_query, etc.)
+    # passent par MessageHandler mais ont update.message = None.
+    # Sans ce guard, AttributeError: 'NoneType' object has no attribute 'text'.
+    if not update.message or not update.message.text:
+        logging.debug("[HANDLER] Ignoré update sans texte (edited_message/callback)")
+        return
     user_msg = update.message.text
     chat_id = update.effective_chat.id
     if chat_id != CHAT_ID:
@@ -450,6 +450,9 @@ if __name__ == '__main__':
                     except Exception as e:
                         logging.debug("[PROBE] Erreur probe: %s", e)
         _background_tasks.append(asyncio.create_task(_probe_deepseek_periodic()))
+        # ── Scheduler interne (backup 03:00, CI 06:00) ──
+        from core.scheduler import scheduler_loop
+        _background_tasks.append(asyncio.create_task(scheduler_loop()))
 
     async def _post_stop(app):
         for task in _background_tasks:
