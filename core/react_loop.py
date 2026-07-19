@@ -375,28 +375,10 @@ async def react_loop(user_message: str,
     allowed_tools = filter_tools(msg_type, user_message)
 
     actual_tools = []
-    for tname, tspec in TOOLS.items():
-        if allowed_tools is not None and tname not in allowed_tools:
+    for tool in TOOLS:
+        if allowed_tools is not None and tool["function"]["name"] not in allowed_tools:
             continue
-        tool_def = {
-            "type": "function",
-            "function": {
-                "name": tname,
-                "description": tspec.get("description", ""),
-                "parameters": {
-                    "type": "object",
-                    "properties": {},
-                    "required": []
-                }
-            }
-        }
-        for pname, pinfo in tspec.get("parameters", {}).items():
-            ptype = pinfo.get("type", "string")
-            tool_def["function"]["parameters"]["properties"][pname] = {
-                "type": ptype,
-                "description": pinfo.get("description", ""),
-            }
-        actual_tools.append(tool_def)
+        actual_tools.append(tool)
 
     logger.info(f"[TOOLS] msg_type={msg_type} tools={len(actual_tools)}/52 (set={allowed_tools is not None})")
 
