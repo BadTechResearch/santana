@@ -412,7 +412,7 @@ async def react_loop(user_message: str,
                 except Exception:
                     pass
 
-        mt = get_provider_config(actual_provider)["max_tokens"]
+        mt = min(cfg["max_tokens"] for cfg in PROVIDER_CONFIGS.values())
 
         if actual_tools:
             tc = "auto"
