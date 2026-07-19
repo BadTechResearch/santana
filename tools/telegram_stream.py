@@ -334,8 +334,8 @@ class TelegramStream:
                 pname = pm.get_active_provider()
                 plabel = pm.get_provider_label(pname)
                 from datetime import datetime
-                import pytz
-                pnow = datetime.now(pytz.timezone("Africa/Kinshasa")).strftime("%H:%M")
+                from zoneinfo import ZoneInfo
+                pnow = datetime.now(ZoneInfo("Africa/Kinshasa")).strftime("%H:%M")
                 text += f"\n[{plabel} {pnow}]"
             except Exception:
                 pass  # silencieux si provider_manager échoue

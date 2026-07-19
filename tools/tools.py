@@ -85,12 +85,12 @@ def _ensure_mcp_loaded():
     finally:
         _MCP_IMPORTED = True
 
-_TZ = None
 try:
-    import pytz
-    _TZ = pytz.timezone("Africa/Kinshasa")
+    from zoneinfo import ZoneInfo
+    _TZ = ZoneInfo("Africa/Kinshasa")
 except Exception as e:
-    logging.error("[TOOLS] pytz import fallback: %s", e)
+    logging.error("[TOOLS] zoneinfo fallback: %s", e)
+    _TZ = None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

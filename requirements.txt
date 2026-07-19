@@ -48,7 +48,6 @@ pyotp==2.9.0
 pypdf==6.13.3
 pytest==9.0.3
 python-telegram-bot==22.7
-pytz==2026.2
 PyYAML==6.0.3
 requests==2.33.1
 requests-oauthlib==2.0.0

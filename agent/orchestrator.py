@@ -51,10 +51,10 @@ def _build_prompt_base() -> str:
     Cette base représente ~70% du prompt et ne change que si les fichiers soul/ sont modifiés.
     """
     try:
-        import pytz
-        now = datetime.now(pytz.timezone("Africa/Kinshasa")).strftime("%A %d %B %Y, %H:%M")
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo("Africa/Kinshasa")).strftime("%A %d %B %Y, %H:%M")
     except Exception as e:
-        logging.error("[SYSTEM] pytz timezone fallback: %s", e)
+        logging.error("[SYSTEM] zoneinfo fallback: %s", e)
         now = datetime.now().strftime("%Y-%m-%d %H:%M")
 
     prompt = (

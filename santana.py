@@ -10,12 +10,42 @@ from core.utils import get_base_dir
 BASE_DIR = get_base_dir()
 ENV_PATH = os.path.join(BASE_DIR, '.env')
 
-# ── PID LOCK : empêche les doubles processus (Correctif 1) ──
+# ── PID LOCK : empêche les doubles processus (Correctif 1 + 13 auto-nettoyant) ──
 _LOCK_FILE = os.path.join(BASE_DIR, '.santana.lock')
-try:
-    _lock_fd = open(_LOCK_FILE, 'w')
-    fcntl.flock(_lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-except (IOError, OSError):
+def _acquire_lock():
+    """Acquiert le lock PID avec auto-nettoyage si le processus précédent est mort."""
+    # #13 : Vérifier si le lock existant est stale
+    if os.path.exists(_LOCK_FILE):
+        try:
+            with open(_LOCK_FILE) as f:
+                old_pid = int(f.read().strip())
+            if old_pid > 0:
+                # Vérifier si le processus existe toujours
+                try:
+                    os.kill(old_pid, 0)  # Teste l'existence sans tuer
+                    # Processus encore vivant → conflit réel
+                    return False
+                except OSError:
+                    # Processus mort → lock stale, on peut continuer
+                    pass
+        except (ValueError, OSError, IOError):
+            pass
+        # Nettoyer le lock stale
+        try:
+            os.unlink(_LOCK_FILE)
+        except OSError:
+            pass
+    try:
+        _fd = open(_LOCK_FILE, 'w')
+        fcntl.flock(_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        _fd.write(str(os.getpid()))
+        _fd.flush()
+        return _fd
+    except (IOError, OSError):
+        return None
+
+_lock_fd = _acquire_lock()
+if not _lock_fd:
     logging.error("[PID LOCK] Un autre processus Santana est déjà en cours. Arrêt.")
     print("[PID LOCK] Conflit de processus détecté. Quitte.", flush=True)
     exit(1)

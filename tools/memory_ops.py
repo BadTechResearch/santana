@@ -8,12 +8,12 @@ from core.utils import get_base_dir
 
 BASE_DIR = get_base_dir()
 
-_TZ = None
 try:
-    import pytz
-    _TZ = pytz.timezone("Africa/Kinshasa")
+    from zoneinfo import ZoneInfo
+    _TZ = ZoneInfo("Africa/Kinshasa")
 except Exception as e:
-    logging.error("[MEMORY_OPS] pytz fallback: %s", e)
+    logging.error("[MEMORY_OPS] zoneinfo fallback: %s", e)
+    _TZ = None
 
 # Atlas
 def _check_atlas_ok():
