@@ -105,7 +105,7 @@ _LEAK_PATTERNS = (
     '<invoke', '<tool_calls>', '<tool_call>', '[Calling tool:'
 )
 
-_MAX_TOOL_RESULT_CHARS = 10000
+_MAX_TOOL_RESULT_CHARS = 8000  # ~2k tokens (Correctif 9)
 _HTML_ERROR_RE = re.compile(
     r'<(html|!DOCTYPE|title>Error|title>404|title>403|title>50[0-9])',
     re.IGNORECASE
@@ -335,8 +335,42 @@ async def react_loop(user_message: str,
 
     provider = get_active_provider()
     actual_provider = provider
+
+    # #11: Filtrage outils par type de message
+    _TOOL_SETS = {
+        "SOCIAL": set(),  # Salutations → outil inutile
+        "FACTUEL": {
+            "web_search", "web_navigate", "get_datetime", "read_pdf",
+            "youtube_info", "social_search", "social_news", "social_browser",
+            "twitter_search", "reddit_search", "instagram_search", "tiktok_search",
+            "fts_memory", "memory_query",
+        },
+        "TECHNIQUE": {
+            "code_modify", "code_list_sources", "run_code", "fs_read", "fs_write",
+            "delegate_task", "read_pdf", "tmux_session", "render_preview",
+            "github_list_repos", "github_list_branches", "github_list_files",
+            "github_read", "github_write", "github_push", "github_delete_file",
+            "github_create_repo", "github_create_branch", "github_create_pr",
+            "github_merge_pr", "cost_governor", "self_inspect",
+            "fts_memory", "memory_query", "workspace_state",
+        },
+    }
+    _CODE_SIGNALS = ["code", "script", "terminal", "programme", "écris", "modifie",
+                      "commit", "push", "git", "déploie", "corrige", "bug", "erreur"]
+
+    if msg_type == "SOCIAL":
+        allowed_tools = _TOOL_SETS["SOCIAL"]
+    elif msg_type == "FACTUEL":
+        allowed_tools = _TOOL_SETS["FACTUEL"]
+    elif any(kw in user_message.lower() for kw in _CODE_SIGNALS):
+        allowed_tools = _TOOL_SETS["TECHNIQUE"]
+    else:
+        allowed_tools = None  # Tous les outils
+
     actual_tools = []
     for tname, tspec in TOOLS.items():
+        if allowed_tools is not None and tname not in allowed_tools:
+            continue
         tool_def = {
             "type": "function",
             "function": {
@@ -357,11 +391,14 @@ async def react_loop(user_message: str,
             }
         actual_tools.append(tool_def)
 
+    logger.info(f"[TOOLS] msg_type={msg_type} tools={len(actual_tools)}/52 (set={allowed_tools is not None})")
+
     use_stream = stream_callback is not None
     last_content = ""
     _last_tokens = 0
     max_iter = _MAX_ITER
     iteration = 0
+    _last_heartbeat = 0.0
     is_self_query = any(kw in user_message.lower()
                         for kw in ["qui es-tu", "décris-toi", "décrivez-vous",
                                    "parle de toi", "ton code", "ton architecture",
@@ -373,8 +410,18 @@ async def react_loop(user_message: str,
             logger.warning(f"[TIMEOUT] Session dépassée ({_elapsed:.0f}s > {_SESSION_TIMEOUT}s)")
             break
 
-        if iteration > 0 and _elapsed > 15 * (iteration // 15):
-            logger.info("[HEARTBEAT] Itération %d, écoulé %.0fs", iteration, _elapsed)
+        # #10: Heartbeat progression utilisateur
+        _hb_interval = max(15, 5 * iteration)
+        if iteration > 0 and _elapsed > _last_heartbeat + _hb_interval:
+            _last_heartbeat = _elapsed
+            _remaining = max(0, _SESSION_TIMEOUT - _elapsed)
+            _progress = f"⏳ Itération {iteration + 1}/{max_iter} — {int(_elapsed)}s écoulées"
+            logger.info("[HEARTBEAT] %s", _progress)
+            if stream_callback:
+                try:
+                    stream_callback(f"__PROGRESS__{_progress}")
+                except Exception:
+                    pass
 
         mt = 32000
 
