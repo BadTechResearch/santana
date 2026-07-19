@@ -723,11 +723,12 @@ _reg_register("delete_user_tool", _tool_creator_delete,
 
 # ── Enregistrement des outils définis ci-dessus ─────────────────────────
 # (placé ici car les fonctions sont définies plus haut dans ce fichier)
-# vm_exec et vm_exec_script retirés le 20 juin 2026 — trop dangereux, Santana
-# bouclait sur des commandes refusées par le security sandbox.
-# Utiliser run_code (sandboxé) à la place.
-# _reg_register("vm_exec", tool_vm_exec, ...)
-# _reg_register("vm_exec_script", tool_vm_exec_script, ...)
+# dev_exec — shell libre pour Santana (remplace vm_exec, ajoute le 19/07/2026).
+# Pas d'allowlist, pas d'denylist. Garde-fous : timeout + filtre tokens + backup crit.
+from tools.dev_exec import tool_dev_exec
+_reg_register("dev_exec", tool_dev_exec,
+    arg_map={"command": "command", "timeout": "timeout"},
+    defaults={"timeout": 60})
 _reg_register("workspace_state", tool_workspace_state, arg_map={"action": "action", "key": "key", "value": "value"}, defaults={"key": "", "value": ""})
 _reg_register("tmux_session", tool_tmux_session, arg_map={"action": "action", "session_name": "session_name", "command": "command"}, defaults={"session_name": "", "command": ""})
 _reg_register("render_preview", tool_render_preview, arg_map={"source": "source"})
