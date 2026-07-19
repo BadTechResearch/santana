@@ -38,9 +38,7 @@ from tools.tool_creator import create_tool as _tool_creator_create, install_depe
 from tools.tool_creator import list_user_tools as _tool_creator_list, delete_user_tool as _tool_creator_delete
 from tools.memory_ops import tool_memory_query, tool_atlas
 from tools.social_search import social_search as tool_social_search_raw
-from tools.social_search import tool_social_news, tool_social_browser, tool_twitter_search, tool_reddit_search
-from tools.social_search import tool_instagram_search, tool_tiktok_search
-from tools.social_search import tool_twitter_lookup, tool_reddit_lookup, tool_instagram_lookup, tool_tiktok_lookup
+from tools.social_search import tool_social_news, tool_social_browser, tool_twitter, tool_reddit, tool_instagram, tool_tiktok
 from tools.code_exec import run_code as tool_run_code_raw
 from tools.vm_security import validate_command, validate_script, safe_env
 from tools.youtube import tool_youtube_info
@@ -104,6 +102,24 @@ def tool_get_datetime() -> str:
     except Exception:
         logging.debug("[TOOL] get_datetime echec, fallback now()")
         return str(datetime.now())
+
+
+def tool_skill(action: str, name: str = "", content: str = "") -> str:
+    """Gère les skills (fichiers .md dans ~/santana/skills/).
+    Actions supportées : view, create, patch, delete, list.
+
+    Args:
+        action: view | create | patch | delete | list
+        name: Nom de la skill (requis pour view/create/patch/delete)
+        content: Contenu complet (requis pour create/patch)
+    """
+    from tools.skills_manager import skill_view, skill_manage, skill_list
+    if action == "list":
+        skills = skill_list()
+        return f"📚 Skills disponibles: {', '.join(skills)}" if skills else "📭 Aucune skill."
+    if action == "view":
+        return skill_view(name)
+    return skill_manage(action, name, content)
 
 
 def tool_save_skill(title, trigger, steps, pitfalls, verification):
@@ -372,14 +388,10 @@ _reg_register("atlas", tool_atlas, arg_map={"context": "context"})
 _reg_register("social_search", tool_social_search, arg_map={"query": "query", "platform": "platform", "count": "count"}, defaults={"count": "5"})
 _reg_register("social_news", tool_social_news, arg_map={"query": "query", "platform": "platform", "max_results": "max_results"}, defaults={"platform": "all", "max_results": "8"})
 _reg_register("social_browser", tool_social_browser, arg_map={"url": "url", "timeout": "timeout"}, defaults={"timeout": "20"})
-_reg_register("twitter_search", tool_twitter_search, arg_map={"query_search": "query_search", "max_tweets": "max_tweets"}, defaults={"max_tweets": "10"})
-_reg_register("reddit_search", tool_reddit_search, arg_map={"query": "query", "subreddit": "subreddit", "max_posts": "max_posts"}, defaults={"max_posts": "10"})
-_reg_register("instagram_search", tool_instagram_search, arg_map={"query": "query", "max_posts": "max_posts"}, defaults={"max_posts": "10"})
-_reg_register("tiktok_search", tool_tiktok_search, arg_map={"query": "query", "max_posts": "max_posts"}, defaults={"max_posts": "10"})
-_reg_register("twitter_lookup", tool_twitter_lookup, arg_map={"handle": "handle", "query": "query", "max_tweets": "max_tweets"}, defaults={"query": "", "max_tweets": "5"})
-_reg_register("reddit_lookup", tool_reddit_lookup, arg_map={"subreddit": "subreddit", "max_posts": "max_posts"}, defaults={"max_posts": "5"})
-_reg_register("instagram_lookup", tool_instagram_lookup, arg_map={"username": "username", "max_posts": "max_posts"}, defaults={"max_posts": "5"})
-_reg_register("tiktok_lookup", tool_tiktok_lookup, arg_map={"username": "username", "max_posts": "max_posts"}, defaults={"max_posts": "5"})
+_reg_register("twitter", tool_twitter, arg_map={"action": "action", "query": "query", "handle": "handle", "max_tweets": "max_tweets"}, defaults={"action": "search", "query": "", "handle": "", "max_tweets": 10})
+_reg_register("reddit", tool_reddit, arg_map={"action": "action", "query": "query", "subreddit": "subreddit", "max_posts": "max_posts"}, defaults={"action": "search", "query": "", "subreddit": "", "max_posts": 10})
+_reg_register("instagram", tool_instagram, arg_map={"action": "action", "query": "query", "username": "username", "max_posts": "max_posts"}, defaults={"action": "search", "query": "", "username": "", "max_posts": 10})
+_reg_register("tiktok", tool_tiktok, arg_map={"action": "action", "query": "query", "username": "username", "max_posts": "max_posts"}, defaults={"action": "search", "query": "", "username": "", "max_posts": 10})
 _reg_register("self_inspect", tool_self_inspect, arg_map={})
 _reg_register("fs_read", tool_fs_read,
               arg_map={"path": "path", "offset": "offset", "limit": "limit"},
@@ -387,9 +399,7 @@ _reg_register("fs_read", tool_fs_read,
 _reg_register("run_code", tool_run_code, arg_map={"code": "code", "language": "language", "timeout": "timeout"}, defaults={"language": "python", "timeout": "30"})
 _reg_register("youtube_info", tool_youtube_info, arg_map={"url": "url", "include_transcript": "include_transcript"}, defaults={"include_transcript": "false"})
 _reg_register("fs_write", tool_fs_write, arg_map={"path": "path", "content": "content"})
-_reg_register("skill_view", _skill_view, arg_map={"name": "name"})
-_reg_register("skill_manage", _skill_manage, arg_map={"action": "action", "name": "name", "content": "content"}, defaults={"content": ""})
-_reg_register("skill_list", _skill_list, arg_map={})
+_reg_register("skill", tool_skill, arg_map={"action": "action", "name": "name", "content": "content"}, defaults={"name": "", "content": ""})
 _reg_register("delegate_task", tool_delegate_task, arg_map={"goal": "goal", "context": "context"}, defaults={"context": ""})
 _reg_register("read_pdf", tool_read_pdf, arg_map={"path": "path", "max_chars": "max_chars"}, defaults={"max_chars": 10000})
 _reg_register("fts_memory", fts_memory_search, arg_map={"query": "query", "limit": "limit"}, defaults={"limit": "5"})
@@ -710,16 +720,6 @@ def tool_vm_exec_script(script: str, workdir: str = "") -> str:
         return f"Erreur script: {str(e)}"
 
 
-# ── Enregistrement des outils de tool_creator ──────────────────────────
-_reg_register("tool_create", _tool_creator_create,
-    arg_map={"name": "name", "description": "description", "parameters_json": "parameters_json",
-             "code": "code", "dependencies": "dependencies", "requires_network": "requires_network"},
-    defaults={"parameters_json": "{}", "dependencies": "", "requires_network": False})
-_reg_register("install_dependencies", _tool_creator_install,
-    arg_map={"name": "name", "requirements": "requirements"})
-_reg_register("list_user_tools", _tool_creator_list)
-_reg_register("delete_user_tool", _tool_creator_delete,
-    arg_map={"name": "name"})
 
 # ── Enregistrement des outils définis ci-dessus ─────────────────────────
 # (placé ici car les fonctions sont définies plus haut dans ce fichier)

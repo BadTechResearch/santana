@@ -14,7 +14,7 @@ import os, json, logging, time, asyncio, sys, threading
 from typing import Dict, Optional
 from datetime import datetime
 
-from tools.cost_governor import check_cost_governor, estimate_cost_from_messages, record_usage
+from tools.cost_governor import record_usage
 from tools.tools import execute_tool, TOOLS
 from deepseek_client import complete, complete_stream
 from agent.context import (
@@ -22,7 +22,7 @@ from agent.context import (
     push_exchange, get_session_buffer, get_session_summary,
     maybe_auto_summarize, reset_session
 )
-from core.provider_manager import get_active_provider
+from core.provider_manager import get_active_provider, get_provider_config
 from agent.orchestrator import build_system_prompt, classify_message
 from core.disambiguate import disambiguate
 from agent.evaluator import evaluate_response, log_evaluation
@@ -293,7 +293,7 @@ async def _finalize(response: str, user_message: str, msg_type: str = "", tools_
     except Exception:
         pass
     push_exchange("assistant", response)
-    save_message("assistant", response, msg_type=msg_type)
+    save_message("assistant", response)
     maybe_auto_summarize()
     # Enregistrement des patterns de dialogue
     if user_message and msg_type:
@@ -412,22 +412,7 @@ async def react_loop(user_message: str,
                 except Exception:
                     pass
 
-        mt = 32000
-
-        _gov = check_cost_governor()
-        if _gov == "STOP":
-            logger.error("[COST] STOP — budget épuisé")
-            last_content = (
-                "Budget de session épuisé pour l'instant. Utilise /reset pour "
-                "réinitialiser le compteur, ou attends le prochain cycle."
-            )
-            break
-        elif _gov == "THROTTLE":
-            logger.warning("[COST] THROTTLE — 95%% du budget atteint, outils coûteux coupés")
-            if actual_tools:
-                actual_tools = [t for t in actual_tools
-                                if t["function"]["name"] not in _EXPENSIVE_TOOLS]
-            max_iter = min(max_iter, iteration + 2)
+        mt = get_provider_config(actual_provider)["max_tokens"]
 
         if actual_tools:
             tc = "auto"

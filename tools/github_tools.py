@@ -627,30 +627,109 @@ def tool_github_merge_pr(repo: str, pull_number: int, commit_title: str = "") ->
         return f"❌ Erreur merge PR: {e}"
 
 
+# ── Outil unifié ───────────────────────────────────────────────────────
+
+@track()
+def tool_github(action: str, repo: str = "", path: str = "", content: str = "",
+                message: str = "", name: str = "", description: str = "",
+                branch: str = "", from_branch: str = "main", head: str = "",
+                title: str = "", body: str = "", base: str = "main",
+                pull_number: int = 0, commit_title: str = "",
+                max_chars: int = 15000, private: bool = True) -> str:
+    """Opérations GitHub : listez les dépôts, branches et fichiers, lisez,
+    écrivez, poussez, créez des PRs, mergez, et bien plus.
+
+    Args:
+        action: Opération à effectuer. Valeurs supportées :
+          - list_repos      : Liste tous les dépôts
+          - list_branches   : Liste les branches d'un dépôt (nécessite repo)
+          - list_files      : Liste les fichiers (nécessite repo, path optionnel)
+          - read            : Lit un fichier (nécessite repo, path ; max_chars optionnel)
+          - write           : Écrit un fichier (nécessite repo, path, content ; message optionnel)
+          - push            : Pousse les commits locaux (nécessite repo)
+          - delete_file     : Supprime un fichier (nécessite repo, path ; message optionnel)
+          - create_repo     : Crée un dépôt (nécessite name ; description, private optionnels)
+          - create_branch   : Crée une branche (nécessite repo, branch ; from_branch=main)
+          - create_pr       : Crée une PR (nécessite repo, head, title ; body, base optionnels)
+          - merge_pr        : Merge une PR (nécessite repo, pull_number ; commit_title optionnel)
+        repo: Nom du dépôt (ex: santana)
+        path: Chemin du fichier pour read/write/list_files/delete_file
+        content: Contenu à écrire (pour write)
+        message: Message de commit (pour write, delete_file)
+        name: Nom du dépôt à créer (pour create_repo)
+        description: Description du dépôt (pour create_repo)
+        branch: Nom de la nouvelle branche (pour create_branch)
+        from_branch: Branche source (pour create_branch, défaut: main)
+        head: Branche source de la PR (pour create_pr)
+        title: Titre de la PR (pour create_pr)
+        body: Corps de la PR (pour create_pr)
+        base: Branche cible de la PR (pour create_pr, défaut: main)
+        pull_number: Numéro de la PR à merger (pour merge_pr)
+        commit_title: Titre de merge (pour merge_pr)
+        max_chars: Maximum de caractères à lire (pour read, défaut: 15000)
+        private: Dépôt privé ? (pour create_repo, défaut: True)
+    """
+    dispatch = {
+        "list_repos":    lambda: tool_github_list_repos(),
+        "list_branches": lambda: tool_github_list_branches(repo=repo),
+        "list_files":    lambda: tool_github_list_files(repo=repo, path=path),
+        "read":          lambda: tool_github_read(repo=repo, path=path, max_chars=max_chars),
+        "write":         lambda: tool_github_write(repo=repo, path=path, content=content, message=message),
+        "push":          lambda: tool_github_push(repo=repo),
+        "delete_file":   lambda: tool_github_delete_file(repo=repo, path=path, message=message),
+        "create_repo":   lambda: tool_github_create_repo(name=name, description=description, private=private),
+        "create_branch": lambda: tool_github_create_branch(repo=repo, branch=branch, from_branch=from_branch),
+        "create_pr":     lambda: tool_github_create_pr(repo=repo, head=head, title=title, body=body, base=base),
+        "merge_pr":      lambda: tool_github_merge_pr(repo=repo, pull_number=pull_number, commit_title=commit_title),
+    }
+    handler = dispatch.get(action)
+    if handler is None:
+        valid = ", ".join(sorted(dispatch.keys()))
+        return f"❌ Action inconnue: '{action}'. Valides: {valid}"
+    return handler()
+
+
 # ── Registre Santana ───────────────────────────────────────────────────────
 
 def register_all():
-    """Enregistre tous les outils GitHub dans le registre Santana."""
+    """Enregistre l'outil GitHub unifié dans le registre Santana."""
     from tools.registry import register as _reg_register
 
-    _reg_register("github_list_repos",    tool_github_list_repos,    arg_map={})
-    _reg_register("github_list_branches", tool_github_list_branches, arg_map={"repo": "repo"})
-    _reg_register("github_list_files",    tool_github_list_files,    arg_map={"repo": "repo", "path": "path"},
-              defaults={"path": ""})
-    _reg_register("github_read",          tool_github_read,          arg_map={"repo": "repo", "path": "path", "max_chars": "max_chars"},
-              defaults={"max_chars": 15000})
-    _reg_register("github_write",         tool_github_write,         arg_map={"repo": "repo", "path": "path", "content": "content", "message": "message"},
-              defaults={"message": ""})
-    _reg_register("github_push",          tool_github_push,          arg_map={"repo": "repo"})
-    _reg_register("github_delete_file",   tool_github_delete_file,   arg_map={"repo": "repo", "path": "path", "message": "message"},
-              defaults={"message": ""})
-    _reg_register("github_create_repo",   tool_github_create_repo,   arg_map={"name": "name", "description": "description", "private": "private"},
-              defaults={"description": "", "private": "True"})
-    _reg_register("github_create_branch", tool_github_create_branch, arg_map={"repo": "repo", "branch": "branch", "from_branch": "from_branch"},
-              defaults={"from_branch": "main"})
-    _reg_register("github_create_pr",     tool_github_create_pr,     arg_map={"repo": "repo", "head": "head", "title": "title", "body": "body", "base": "base"},
-              defaults={"body": "", "base": "main"})
-    _reg_register("github_merge_pr",      tool_github_merge_pr,      arg_map={"repo": "repo", "pull_number": "pull_number", "commit_title": "commit_title"},
-              defaults={"commit_title": ""})
+    _reg_register("github", tool_github, arg_map={
+        "action": "action",
+        "repo": "repo",
+        "path": "path",
+        "content": "content",
+        "message": "message",
+        "name": "name",
+        "description": "description",
+        "branch": "branch",
+        "from_branch": "from_branch",
+        "head": "head",
+        "title": "title",
+        "body": "body",
+        "base": "base",
+        "pull_number": "pull_number",
+        "commit_title": "commit_title",
+        "max_chars": "max_chars",
+        "private": "private",
+    }, defaults={
+        "repo": "",
+        "path": "",
+        "content": "",
+        "message": "",
+        "name": "",
+        "description": "",
+        "branch": "",
+        "from_branch": "main",
+        "head": "",
+        "title": "",
+        "body": "",
+        "base": "main",
+        "pull_number": 0,
+        "commit_title": "",
+        "max_chars": 15000,
+        "private": True,
+    })
 
-    logging.info("[GITHUB] 11 outils enregistrés : github_list_repos, github_list_branches, github_list_files, github_read, github_write, github_push, github_delete_file, github_create_repo, github_create_branch, github_create_pr, github_merge_pr")
+    logging.info("[GITHUB] Outil unifié 'github' enregistré (remplace 11 outils)")

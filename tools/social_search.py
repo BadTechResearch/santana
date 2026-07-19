@@ -526,6 +526,72 @@ def tool_tiktok_lookup(username="", max_posts=5):
     return tool_tiktok_search(query=f"@{username}", max_posts=max_posts)
 
 
+# ── Dispatchers unifiés search+lookup ──────────────────────────────────
+
+def tool_twitter(action: str = "search", query: str = "", handle: str = "",
+                  max_tweets: int = 10) -> str:
+    """Cherche des tweets par mot-clé (action=search) ou lit le profil
+    d'un compte (action=lookup).
+
+    Args:
+        action: search | lookup
+        query: Mots-clés (pour search)
+        handle: @username (pour lookup)
+        max_tweets: Maximum de tweets (défaut: 10)
+    """
+    if action == "lookup":
+        return tool_twitter_lookup(handle=handle, query=query, max_tweets=max_tweets)
+    return tool_twitter_search(query_search=query, max_tweets=max_tweets)
+
+
+def tool_reddit(action: str = "search", query: str = "", subreddit: str = "",
+                 max_posts: int = 10) -> str:
+    """Cherche des posts Reddit par mot-clé (action=search) ou lit un
+    subreddit (action=lookup).
+
+    Args:
+        action: search | lookup
+        query: Mots-clés (pour search)
+        subreddit: Nom du subreddit (pour search et lookup)
+        max_posts: Maximum de posts (défaut: 10)
+    """
+    if action == "lookup":
+        return tool_reddit_lookup(subreddit=subreddit, max_posts=max_posts)
+    return tool_reddit_search(query=query, subreddit=subreddit, max_posts=max_posts)
+
+
+def tool_instagram(action: str = "search", query: str = "", username: str = "",
+                    max_posts: int = 10) -> str:
+    """Cherche des posts Instagram par mot-clé (action=search) ou lit un
+    compte (action=lookup).
+
+    Args:
+        action: search | lookup
+        query: Mots-clés (pour search)
+        username: Nom du compte (pour lookup)
+        max_posts: Maximum de posts (défaut: 10)
+    """
+    if action == "lookup":
+        return tool_instagram_lookup(username=username, max_posts=max_posts)
+    return tool_instagram_search(query=query, max_posts=max_posts)
+
+
+def tool_tiktok(action: str = "search", query: str = "", username: str = "",
+                 max_posts: int = 10) -> str:
+    """Cherche des vidéos TikTok par mot-clé (action=search) ou lit un
+    compte (action=lookup).
+
+    Args:
+        action: search | lookup
+        query: Mots-clés (pour search)
+        username: Nom du compte (pour lookup)
+        max_posts: Maximum de posts (défaut: 10)
+    """
+    if action == "lookup":
+        return tool_tiktok_lookup(username=username, max_posts=max_posts)
+    return tool_tiktok_search(query=query, max_posts=max_posts)
+
+
 def tool_social_news(query="", platform="all", max_results=8):
     """Cherche des actualités récentes sur les réseaux sociaux via Google News RSS.
 

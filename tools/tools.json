@@ -344,87 +344,6 @@
   {
     "type": "function",
     "function": {
-      "name": "github_list_files",
-      "description": "Liste les fichiers d'un depot GitHub.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "repo": {
-            "type": "string",
-            "description": "Nom du depot (ex: proprietaire/repo)"
-          },
-          "path": {
-            "type": "string",
-            "description": "Chemin dans le depot (defaut: racine)"
-          }
-        },
-        "required": [
-          "repo"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "github_read",
-      "description": "Lit un fichier depuis GitHub.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "repo": {
-            "type": "string",
-            "description": "Nom du depot (ex: proprietaire/repo)"
-          },
-          "path": {
-            "type": "string",
-            "description": "Chemin du fichier"
-          }
-        },
-        "required": [
-          "repo",
-          "path"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "github_write",
-      "description": "Ecrit un fichier sur GitHub (cree ou met a jour).",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "repo": {
-            "type": "string",
-            "description": "Nom du depot (ex: proprietaire/repo)"
-          },
-          "path": {
-            "type": "string",
-            "description": "Chemin du fichier"
-          },
-          "content": {
-            "type": "string",
-            "description": "Contenu du fichier"
-          },
-          "message": {
-            "type": "string",
-            "description": "Message de commit"
-          }
-        },
-        "required": [
-          "repo",
-          "path",
-          "content",
-          "message"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
       "name": "cost_governor",
       "description": "Gouverneur de cout : surveille et controle la consommation API. Actions : status (defaut), report, reset, set_budget. Utilise pour verifier le budget restant, le cout de la session, ou ajuster le budget.",
       "parameters": {
@@ -505,64 +424,6 @@
   {
     "type": "function",
     "function": {
-      "name": "skill_view",
-      "description": "Charge une skill depuis les fichiers .md dans ~/santana/skills/. Le contenu est injectable dans le contexte LLM.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string",
-            "description": "Nom de la skill (sans .md)"
-          }
-        },
-        "required": [
-          "name"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "skill_manage",
-      "description": "Cree, modifie ou supprime une skill en fichier .md dans ~/santana/skills/. Actions: create, patch, delete.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "action": {
-            "type": "string",
-            "description": "create, patch ou delete"
-          },
-          "name": {
-            "type": "string",
-            "description": "Nom de la skill (sans .md)"
-          },
-          "content": {
-            "type": "string",
-            "description": "Contenu complet (requis pour create et patch)"
-          }
-        },
-        "required": [
-          "action",
-          "name"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "skill_list",
-      "description": "Liste toutes les skills disponibles dans ~/santana/skills/.",
-      "parameters": {
-        "type": "object",
-        "properties": {}
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
       "name": "delegate_task",
       "description": "Delegue une tache a un sous-agent Santana isole (execution parallele). Utile pour traiter plusieurs questions en parallele ou effectuer une tache longue sans bloquer la conversation.",
       "parameters": {
@@ -602,198 +463,6 @@
         },
         "required": [
           "path"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "instagram_search",
-      "description": "Cherche des posts Instagram par mot-cle via Xpoz SDK (12 credits/req). Retourne caption, likes, commentaires, images. Pour la RDC ou tout sujet d'actualite visuelle.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string",
-            "description": "Termes de recherche"
-          },
-          "max_posts": {
-            "type": "integer",
-            "description": "Maximum de posts (defaut: 10, max: 20)"
-          }
-        },
-        "required": [
-          "query"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "tiktok_search",
-      "description": "Cherche des videos TikTok par mot-cle via Xpoz SDK (5 credits/req). Retourne description, likes, plays, hashtags. Pour les tendances, contenus viraux, actualites.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string",
-            "description": "Termes de recherche"
-          },
-          "max_posts": {
-            "type": "integer",
-            "description": "Maximum de videos (defaut: 10, max: 20)"
-          }
-        },
-        "required": [
-          "query"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "twitter_lookup",
-      "description": "Cherche les tweets recents d'un compte Twitter/X specifique. Alternative a twitter_search quand on connait le nom du compte (@handle).",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "handle": {
-            "type": "string",
-            "description": "Nom du compte Twitter sans @ (ex: PresidenceRDC)"
-          },
-          "query": {
-            "type": "string",
-            "description": "Filtre optionnel dans les tweets du compte"
-          },
-          "max_tweets": {
-            "type": "integer",
-            "description": "Maximum de tweets (defaut: 5, max: 50)"
-          }
-        },
-        "required": [
-          "handle"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "reddit_lookup",
-      "description": "Regarde les posts recents d'un subreddit specifique. Ex: reddit_lookup subreddit='RDC', max_posts=10",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "subreddit": {
-            "type": "string",
-            "description": "Nom du subreddit (sans r/)"
-          },
-          "max_posts": {
-            "type": "integer",
-            "description": "Maximum de posts (defaut: 5, max: 50)"
-          }
-        },
-        "required": [
-          "subreddit"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "instagram_lookup",
-      "description": "Regarde les posts publics recents d'un compte Instagram. Attention: 12 credits/req Xpoz.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "username": {
-            "type": "string",
-            "description": "Nom d'utilisateur Instagram"
-          },
-          "max_posts": {
-            "type": "integer",
-            "description": "Maximum de posts (defaut: 5, max: 20)"
-          }
-        },
-        "required": [
-          "username"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "tiktok_lookup",
-      "description": "Regarde les videos recents d'un compte TikTok specifique.",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "username": {
-            "type": "string",
-            "description": "Nom d'utilisateur TikTok"
-          },
-          "max_posts": {
-            "type": "integer",
-            "description": "Maximum de videos (defaut: 5, max: 20)"
-          }
-        },
-        "required": [
-          "username"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "twitter_search",
-      "description": "Cherche des tweets recents par mot-cle via Xpoz SDK (fallback DuckDuckGo).",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "query_search": {
-            "type": "string",
-            "description": "Termes de recherche"
-          },
-          "max_tweets": {
-            "type": "integer",
-            "description": "Maximum de tweets (defaut: 10, max: 50)"
-          }
-        },
-        "required": [
-          "query_search"
-        ]
-      }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "reddit_search",
-      "description": "Cherche des posts Reddit par mot-cle via Xpoz SDK (fallback DuckDuckGo).",
-      "parameters": {
-        "type": "object",
-        "properties": {
-          "query": {
-            "type": "string",
-            "description": "Termes de recherche"
-          },
-          "subreddit": {
-            "type": "string",
-            "description": "Sous-reddit specifique (optionnel)"
-          },
-          "max_posts": {
-            "type": "integer",
-            "description": "Maximum de posts (defaut: 10, max: 50)"
-          }
-        },
-        "required": [
-          "query"
         ]
       }
     }
@@ -881,7 +550,7 @@
     "type": "function",
     "function": {
       "name": "code_list_sources",
-      "description": "Liste les fichiers sources Python de Santana par dossier. Utile avant code_modify pour v\u00e9rifier les noms exacts.",
+      "description": "Liste les fichiers sources Python de Santana par dossier. Utile avant code_modify pour vérifier les noms exacts.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -900,84 +569,12 @@
     "type": "function",
     "function": {
       "name": "restart_self",
-      "description": "RED\u00c9MARRE Santana. Utilise APRES avoir modifi\u00e9 le code avec code_modify ou tool_create pour appliquer les changements.",
+      "description": "REDÉMARRE Santana. Utilise APRES avoir modifié le code avec code_modify ou tool_create pour appliquer les changements.",
       "parameters": {
         "type": "object",
         "properties": {},
         "required": []
       }
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "tool_create"
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "install_dependencies"
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "list_user_tools"
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "delete_user_tool"
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "github_list_repos"
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "github_list_branches"
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "github_push"
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "github_delete_file"
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "github_create_repo"
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "github_create_branch"
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "github_create_pr"
-    }
-  },
-  {
-    "type": "function",
-    "function": {
-      "name": "github_merge_pr"
     }
   },
   {
@@ -998,7 +595,279 @@
             "default": 5
           }
         },
-        "required": ["query"]
+        "required": [
+          "query"
+        ]
+      }
+    }
+  },
+  {
+    "function": {
+      "name": "github",
+      "description": "Opérations GitHub : listez les dépôts, branches et fichiers, lisez, écrivez, poussez, créez des PRs, mergez, et bien plus. Utilisez le paramètre 'action' pour choisir l'opération. Actions supportées : list_repos, list_branches, list_files, read, write, push, delete_file, create_repo, create_branch, create_pr, merge_pr.",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Opération à effectuer. Voir la description pour la liste complète.",
+            "enum": [
+              "list_repos",
+              "list_branches",
+              "list_files",
+              "read",
+              "write",
+              "push",
+              "delete_file",
+              "create_repo",
+              "create_branch",
+              "create_pr",
+              "merge_pr"
+            ]
+          },
+          "repo": {
+            "type": "string",
+            "description": "Nom du dépôt (ex: santana) — requis pour list_branches, list_files, read, write, push, delete_file, create_branch, create_pr, merge_pr"
+          },
+          "path": {
+            "type": "string",
+            "description": "Chemin du fichier — requis pour read, write, delete_file ; optionnel pour list_files"
+          },
+          "content": {
+            "type": "string",
+            "description": "Contenu à écrire — requis pour write"
+          },
+          "message": {
+            "type": "string",
+            "description": "Message de commit — optionnel pour write, delete_file"
+          },
+          "name": {
+            "type": "string",
+            "description": "Nom du dépôt à créer — requis pour create_repo"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description — optionnel pour create_repo"
+          },
+          "branch": {
+            "type": "string",
+            "description": "Nom de la nouvelle branche — requis pour create_branch"
+          },
+          "from_branch": {
+            "type": "string",
+            "description": "Branche source — optionnel pour create_branch (défaut: main)"
+          },
+          "head": {
+            "type": "string",
+            "description": "Branche source de la PR — requis pour create_pr"
+          },
+          "title": {
+            "type": "string",
+            "description": "Titre — requis pour create_pr"
+          },
+          "body": {
+            "type": "string",
+            "description": "Corps de la PR — optionnel pour create_pr"
+          },
+          "base": {
+            "type": "string",
+            "description": "Branche cible — optionnel pour create_pr (défaut: main)"
+          },
+          "pull_number": {
+            "type": "integer",
+            "description": "Numéro de la PR à merger — requis pour merge_pr"
+          },
+          "commit_title": {
+            "type": "string",
+            "description": "Titre de merge — optionnel pour merge_pr"
+          },
+          "max_chars": {
+            "type": "integer",
+            "description": "Max caractères à lire — optionnel pour read (défaut: 15000)"
+          },
+          "private": {
+            "type": "boolean",
+            "description": "Dépôt privé ? — optionnel pour create_repo (défaut: true)"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    }
+  },
+  {
+    "function": {
+      "name": "skill",
+      "description": "Gère les skills (fichiers .md). Actions : view (affiche une skill), create (crée une skill), patch (modifie une skill), delete (supprime une skill), list (liste toutes les skills).",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "description": "Opération : view, create, patch, delete, list",
+            "enum": [
+              "view",
+              "create",
+              "patch",
+              "delete",
+              "list"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "description": "Nom de la skill (sans .md) — requis pour view, create, patch, delete"
+          },
+          "content": {
+            "type": "string",
+            "description": "Contenu complet — requis pour create et patch"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    }
+  },
+  {
+    "function": {
+      "name": "twitter",
+      "description": "Recherche de tweets sur Twitter/X. Utilisez action=search avec un query pour chercher par mots-clés, ou action=lookup avec un handle pour voir les tweets d'un compte spécifique.",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "search",
+              "lookup"
+            ],
+            "description": "search=par mots-clés, lookup=profil d'un compte"
+          },
+          "query": {
+            "type": "string",
+            "description": "Mots-clés (requis pour search)"
+          },
+          "handle": {
+            "type": "string",
+            "description": "@username du compte (requis pour lookup)"
+          },
+          "max_tweets": {
+            "type": "integer",
+            "description": "Maximum de tweets (défaut: 10)"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    }
+  },
+  {
+    "function": {
+      "name": "reddit",
+      "description": "Recherche sur Reddit. Utilisez action=search avec un query pour chercher des posts par mots-clés, ou action=lookup avec subreddit pour voir les posts d'un subreddit spécifique.",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "search",
+              "lookup"
+            ],
+            "description": "search=par mots-clés, lookup=subreddit spécifique"
+          },
+          "query": {
+            "type": "string",
+            "description": "Mots-clés (requis pour search)"
+          },
+          "subreddit": {
+            "type": "string",
+            "description": "Nom du subreddit (requis pour lookup, optionnel pour search)"
+          },
+          "max_posts": {
+            "type": "integer",
+            "description": "Maximum de posts (défaut: 10)"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    }
+  },
+  {
+    "function": {
+      "name": "instagram",
+      "description": "Recherche sur Instagram. Utilisez action=search avec un query pour chercher par mots-clés, ou action=lookup avec username pour voir les posts d'un compte spécifique.",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "search",
+              "lookup"
+            ],
+            "description": "search=par mots-clés, lookup=compte spécifique"
+          },
+          "query": {
+            "type": "string",
+            "description": "Mots-clés (requis pour search)"
+          },
+          "username": {
+            "type": "string",
+            "description": "Nom du compte Instagram (requis pour lookup)"
+          },
+          "max_posts": {
+            "type": "integer",
+            "description": "Maximum de posts (défaut: 10)"
+          }
+        },
+        "required": [
+          "action"
+        ]
+      }
+    }
+  },
+  {
+    "function": {
+      "name": "tiktok",
+      "description": "Recherche sur TikTok. Utilisez action=search avec un query pour chercher par mots-clés, ou action=lookup avec username pour voir les vidéos d'un compte spécifique.",
+      "strict": false,
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "search",
+              "lookup"
+            ],
+            "description": "search=par mots-clés, lookup=compte spécifique"
+          },
+          "query": {
+            "type": "string",
+            "description": "Mots-clés (requis pour search)"
+          },
+          "username": {
+            "type": "string",
+            "description": "Nom du compte TikTok (requis pour lookup)"
+          },
+          "max_posts": {
+            "type": "integer",
+            "description": "Maximum de posts (défaut: 10)"
+          }
+        },
+        "required": [
+          "action"
+        ]
       }
     }
   }
