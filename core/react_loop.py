@@ -65,6 +65,41 @@ def _reset_quarantine():
     """Vide la quarantaine (appelé par /reset)."""
     _TOOL_FAILURES.clear()
 
+
+# ── Filtrage outils par type (#11) ──
+_TOOL_SETS = {
+    "SOCIAL": set(),
+    "FACTUEL": {
+        "web_search", "web_navigate", "get_datetime", "read_pdf",
+        "youtube_info", "social_search", "social_news", "social_browser",
+        "twitter_search", "reddit_search", "instagram_search", "tiktok_search",
+        "fts_memory", "memory_query",
+    },
+    "TECHNIQUE": {
+        "code_modify", "code_list_sources", "run_code", "fs_read", "fs_write",
+        "delegate_task", "read_pdf", "tmux_session", "render_preview",
+        "github_list_repos", "github_list_branches", "github_list_files",
+        "github_read", "github_write", "github_push", "github_delete_file",
+        "github_create_repo", "github_create_branch", "github_create_pr",
+        "github_merge_pr", "cost_governor", "self_inspect",
+        "fts_memory", "memory_query", "workspace_state",
+    },
+}
+_CODE_SIGNALS = ["code", "script", "terminal", "programme", "écris", "modifie",
+                  "commit", "push", "git", "déploie", "corrige", "bug", "erreur"]
+
+
+def filter_tools(msg_type: str, user_message: str) -> set | None:
+    """Retourne le set d'outils autorisés pour ce type de message, ou None (tous)."""
+    if msg_type == "SOCIAL":
+        return _TOOL_SETS["SOCIAL"]
+    elif msg_type == "FACTUEL":
+        return _TOOL_SETS["FACTUEL"]
+    elif any(kw in user_message.lower() for kw in _CODE_SIGNALS):
+        return _TOOL_SETS["TECHNIQUE"]
+    return None
+
+
 # ─── Task State (reprise après interruption) ────────────────────────
 from core.task_state import set_task, get_task, clear_task, resume_prompt
 
@@ -337,35 +372,7 @@ async def react_loop(user_message: str,
     actual_provider = provider
 
     # #11: Filtrage outils par type de message
-    _TOOL_SETS = {
-        "SOCIAL": set(),  # Salutations → outil inutile
-        "FACTUEL": {
-            "web_search", "web_navigate", "get_datetime", "read_pdf",
-            "youtube_info", "social_search", "social_news", "social_browser",
-            "twitter_search", "reddit_search", "instagram_search", "tiktok_search",
-            "fts_memory", "memory_query",
-        },
-        "TECHNIQUE": {
-            "code_modify", "code_list_sources", "run_code", "fs_read", "fs_write",
-            "delegate_task", "read_pdf", "tmux_session", "render_preview",
-            "github_list_repos", "github_list_branches", "github_list_files",
-            "github_read", "github_write", "github_push", "github_delete_file",
-            "github_create_repo", "github_create_branch", "github_create_pr",
-            "github_merge_pr", "cost_governor", "self_inspect",
-            "fts_memory", "memory_query", "workspace_state",
-        },
-    }
-    _CODE_SIGNALS = ["code", "script", "terminal", "programme", "écris", "modifie",
-                      "commit", "push", "git", "déploie", "corrige", "bug", "erreur"]
-
-    if msg_type == "SOCIAL":
-        allowed_tools = _TOOL_SETS["SOCIAL"]
-    elif msg_type == "FACTUEL":
-        allowed_tools = _TOOL_SETS["FACTUEL"]
-    elif any(kw in user_message.lower() for kw in _CODE_SIGNALS):
-        allowed_tools = _TOOL_SETS["TECHNIQUE"]
-    else:
-        allowed_tools = None  # Tous les outils
+    allowed_tools = filter_tools(msg_type, user_message)
 
     actual_tools = []
     for tname, tspec in TOOLS.items():
