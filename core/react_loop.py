@@ -30,6 +30,41 @@ from memory.memory import get_recent_memory, save_message
 
 from core.utils import get_base_dir, strip_dsml
 
+
+# ── Quarantaine d'outils (3 fails → 1h, Correctif 6) ──
+_TOOL_FAILURES: dict[str, list[float]] = {}
+_QUARANTINE_DURATION = 3600  # 1 heure
+_QUARANTINE_THRESHOLD = 3    # 3 échecs consécutifs
+
+
+def _is_tool_quarantined(name: str) -> bool:
+    """Vérifie si un outil est en quarantaine (3+ échecs dans l'heure)."""
+    if name not in _TOOL_FAILURES:
+        return False
+    failures = _TOOL_FAILURES[name]
+    now = time.time()
+    failures[:] = [f for f in failures if now - f < _QUARANTINE_DURATION]
+    if len(failures) >= _QUARANTINE_THRESHOLD:
+        oldest = failures[0]
+        remaining = int(_QUARANTINE_DURATION - (now - oldest))
+        logger.warning(f"[QUARANTINE] {name} bloqué encore {remaining // 60}m")
+        return True
+    return False
+
+
+def _record_tool_failure(name: str):
+    """Enregistre un échec d'outil pour la quarantaine."""
+    if name not in _TOOL_FAILURES:
+        _TOOL_FAILURES[name] = []
+    _TOOL_FAILURES[name].append(time.time())
+    nfails = len(_TOOL_FAILURES[name])
+    logger.warning(f"[QUARANTINE] {name} échec #{nfails}/{_QUARANTINE_THRESHOLD}")
+
+
+def _reset_quarantine():
+    """Vide la quarantaine (appelé par /reset)."""
+    _TOOL_FAILURES.clear()
+
 # ─── Task State (reprise après interruption) ────────────────────────
 from core.task_state import set_task, get_task, clear_task, resume_prompt
 
@@ -69,6 +104,32 @@ _EXPENSIVE_TOOLS = {      # Outils bloqués à 95%+ du budget
 _LEAK_PATTERNS = (
     '<invoke', '<tool_calls>', '<tool_call>', '[Calling tool:'
 )
+
+_MAX_TOOL_RESULT_CHARS = 10000
+_HTML_ERROR_RE = re.compile(
+    r'<(html|!DOCTYPE|title>Error|title>404|title>403|title>50[0-9])',
+    re.IGNORECASE
+)
+
+
+def _validate_tool_result(name: str, result: str) -> str:
+    """Valide et nettoie un résultat d'outil avant injection dans le contexte LLM.
+
+    Vérifie : contenu non vide, pas de page d'erreur HTML, taille limite.
+    Si invalide, retourne un message d'erreur explicite.
+    """
+    if not result or result.strip() in ("null", "{}", "[]"):
+        return json.dumps({"error": f"L'outil {name} n'a retourné aucun résultat."})
+
+    if _HTML_ERROR_RE.search(result[:500]):
+        return json.dumps({"error": f"L'outil {name} a retourné une page d'erreur."})
+
+    if len(result) > _MAX_TOOL_RESULT_CHARS:
+        logger.info(f"[VALIDATE] {name}: tronqué de {len(result)} à {_MAX_TOOL_RESULT_CHARS} chars")
+        return result[:_MAX_TOOL_RESULT_CHARS] + "\n\n[... résultat tronqué — trop long]"
+
+    return result
+
 
 logger = logging.getLogger(__name__)
 
@@ -315,7 +376,7 @@ async def react_loop(user_message: str,
         if iteration > 0 and _elapsed > 15 * (iteration // 15):
             logger.info("[HEARTBEAT] Itération %d, écoulé %.0fs", iteration, _elapsed)
 
-        mt = 32000 if iteration == 0 else 8000
+        mt = 32000
 
         _gov = check_cost_governor()
         if _gov == "STOP":
@@ -446,8 +507,21 @@ async def react_loop(user_message: str,
                 return await _finalize(last_content or "Je n'ai pas pu effectuer la recherche.", user_message, msg_type=msg_type, tools_used=_tools_called)
 
             cleaned = strip_dsml(content) if content else ""
+
+            # #4: Continuation sur length — injecter prompt de continuation
+            if finish_reason == "length" and cleaned and iteration < max_iter - 1:
+                logger.warning(f"[LENGTH] Limite à l'itération {iteration}, continuation...")
+                messages.append(msg)
+                messages.append({
+                    "role": "user",
+                    "content": "Continue ta réponse. Tu étais en train d'écrire."
+                })
+                iteration += 1
+                continue
+
             if finish_reason == "length" and cleaned:
-                logger.warning(f"[LENGTH] Limite atteinte — {len(cleaned)} chars, livraison immédiate")
+                logger.warning(f"[LENGTH] Max itération atteinte, livraison contenu partiel ({len(cleaned)} chars)")
+
             if not is_self_query:
                 _schedule_background_eval(cleaned, user_message)
             return await _finalize(cleaned or "Pas de réponse.", user_message, msg_type=msg_type, tools_used=_tools_called)
@@ -474,35 +548,49 @@ async def react_loop(user_message: str,
         except Exception:
             pass
 
-        # Exécuter chaque tool call
-        for tc in tool_calls:
+        # #7: Exécution parallèle des tool calls (asyncio.gather)
+        async def _execute_one(tc):
             tc_id = tc.get("id", "")
             tname = tc.get("function", {}).get("name", "")
             try:
                 targs = json.loads(tc.get("function", {}).get("arguments", "{}"))
             except json.JSONDecodeError:
                 logger.warning(f"[TOOL] Échec parsing args pour {tname}")
-                targs = {}
+                return {"role": "tool", "tool_call_id": tc.get("id", ""), "content": "Erreur de parsing JSON des arguments"}
 
             error = _validate_tool_call(tname, targs)
             if error:
-                messages.append({"role": "tool", "tool_call_id": tc_id, "content": error})
-                continue
+                return {"role": "tool", "tool_call_id": tc_id, "content": error}
+
+            # #6: Vérifier quarantaine avant exécution
+            if _is_tool_quarantined(tname):
+                logger.warning(f"[QUARANTINE] {tname} sauté (quarantaine active)")
+                return {
+                    "role": "tool", "tool_call_id": tc_id,
+                    "content": json.dumps({"error": f"Outil {tname} temporairement indisponible (trop d'échecs récents)."})
+                }
 
             try:
-                # Tracker l'outil avant exécution
-                try:
-                    set_task("Réponse Santana", f"outil:{tname}", _action_label[:60])
-                except Exception:
-                    pass
-                tresult = execute_tool(tname, targs)
+                set_task("Réponse Santana", f"outil:{tname}", _action_label[:60])
+                tresult = await asyncio.to_thread(execute_tool, tname, targs)
                 _tools_called.add(tname)
                 logger.info(f"[TOOL] {tname}(...) -> {str(tresult)[:200]}")
+                return {"role": "tool", "tool_call_id": tc_id, "content": _validate_tool_result(tname, tresult)}
             except Exception as _te:
-                tresult = f"Erreur: {_te}"
                 logger.error(f"[TOOL] Erreur {tname}: {_te}")
+                _record_tool_failure(tname)
+                return {"role": "tool", "tool_call_id": tc_id, "content": json.dumps({"error": f"{_te}"})}
 
-            messages.append({"role": "tool", "tool_call_id": tc_id, "content": str(tresult)})
+        tool_results = await asyncio.gather(*[_execute_one(tc) for tc in tool_calls])
+        for tr in tool_results:
+            messages.append(tr)
+
+        # #8: Résumer le buffer session après chaque itération
+        try:
+            from agent.context import maybe_auto_summarize
+            maybe_auto_summarize()
+        except Exception:
+            pass
 
         iteration += 1
 
