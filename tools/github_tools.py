@@ -155,24 +155,30 @@ def _git_env() -> dict:
     env["GIT_AUTHOR_EMAIL"] = _GIT_EMAIL
     env["GIT_COMMITTER_NAME"] = _GIT_NAME
     env["GIT_COMMITTER_EMAIL"] = _GIT_EMAIL
-    # Forcer l'URL avec token embarqué
+    # Credential helper — pas de token dans l'URL (évite fuite via ps aux)
     env["GIT_ASKPASS"] = ""  # désactive tout helper externe
     env["GIT_TERMINAL_PROMPT"] = "0"
+    env["GITHUB_TOKEN"] = token  # injecté dans le credential helper, pas dans la ligne de commande
     return env
 
 
 def _repo_url_https(repo: str) -> str:
-    """URL HTTPS avec token embarqué pour auth silencieuse."""
-    token = _get_token()
-    return f"https://x-access-token:{token}@github.com/{GITHUB_ACCOUNT}/{_clean_repo_name(repo)}.git"
+    """URL HTTPS — l'auth passe par credential helper (pas de token dans l'URL)."""
+    return f"https://github.com/{GITHUB_ACCOUNT}/{_clean_repo_name(repo)}.git"
 
 
 def _git(cmd: list[str], cwd: str = None, timeout: int = 30) -> subprocess.CompletedProcess:
-    """Exécute une commande git avec token HTTPS."""
+    """Exécute une commande git avec credential helper (pas de token dans la ligne de commande)."""
     env = _git_env()
+    token = env.get("GITHUB_TOKEN", "")
+    # Credential helper via env var — évite d'embarquer le token dans l'URL ou la ligne de commande
+    git_cmd = ["git"]
+    if token:
+        git_cmd += ["-c", 'credential.helper=!f() { echo "username=x-access-token"; echo "password=$GITHUB_TOKEN"; }; f']
+    git_cmd += cmd
     try:
         result = subprocess.run(
-            ["git"] + cmd,
+            git_cmd,
             capture_output=True,
             text=True,
             timeout=timeout,

@@ -272,7 +272,9 @@ def tool_fs_write(path: str, content: str) -> str:
     """
     _WRITE_SAFE_DIRS = ["tools", "agent", "core", "skills", "workspace", "tests", "soul", "scripts", "metrics", "atlas_engine", "memory"]
     # Normaliser le chemin
-    clean_path = path.lstrip("/").lstrip(".")
+    clean_path = path
+    while clean_path.startswith("/") or clean_path.startswith("."):
+        clean_path = clean_path[1:]
     parts = clean_path.split("/")
     if not parts or parts[0] not in _WRITE_SAFE_DIRS:
         return f"Erreur: écriture autorisée uniquement dans {_WRITE_SAFE_DIRS}."

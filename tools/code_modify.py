@@ -75,7 +75,9 @@ def _validate_path(path: str) -> tuple[bool, str, str]:
     Returns:
         (valide, message_erreur, chemin_absolu)
     """
-    clean = path.lstrip("/").lstrip(".")
+    clean = path
+    while clean.startswith("/") or clean.startswith("."):
+        clean = clean[1:]
     parts = clean.split("/")
     abs_path = os.path.realpath(os.path.join(BASE, clean))
 
